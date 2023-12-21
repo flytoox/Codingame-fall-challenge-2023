@@ -6,46 +6,102 @@
 #include <cmath>
 #include <set>
 
-using namespace std;
-map<int, int> mnstr1, mnstr2;
+#define DISTANCE 1978
 
+using namespace std;
+
+map<int, pair<int, int>> mnstr1, mnstr2;
+map<int, string> RaMnstr1, RaMnstr2;
 map<int, int> fshs;
 int myX1, myX2, myY1, myY2, myID1, myID2;
 set<int> enemies;
+
+string nextR1 = "", nextR2 = "";
 
 
 int calcDist(int x1, int y1, int x2, int y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 
-void displayMove(vector<string> &rdrs, int x, int y, int l) {
-    int tr=0,tl=1,bl=2,br=3;
+void MoveDrone(int id, int x, int y, string Dir, int l, bool itsEmergency) {
 
+    if (id == myID1) {
+        if (nextR1 != "") Dir = nextR1, nextR1 = "";
+        else if(itsEmergency) nextR1 = Dir;
+    }
+    else {
+        if (nextR2 != "") Dir = nextR2, nextR2 = "";
+        else if(itsEmergency) nextR2 = Dir;
+    }
     int PlusX, MinusX, PlusY, MinusY;
-    PlusX = min(x + 4000, 9999), MinusX = max(x - 4000, 0);
-    PlusY = min(y + 4000, 9999), MinusY = max(y - 4000, 0);
-    // PlusX = 9999, MinusX = 0, PlusY = 9999, MinusY = 0;
+    PlusX = min(x + DISTANCE, 9999), MinusX = max(x - DISTANCE, 0);
+    PlusY = min(y + DISTANCE, 9999), MinusY = max(y - DISTANCE, 0);
+
+    if (Dir == "TR")
+        cout << "MOVE "<< PlusX << ' ' << MinusY << ' ' << l<<"\n";
+    else if (Dir == "TL")
+        cout << "MOVE "<< MinusX << ' ' << MinusY << ' ' << l<<"\n";
+    else if (Dir == "BL")
+        cout << "MOVE "<< MinusX << ' ' << PlusY << ' ' << l<<"\n";
+    else if (Dir == "BR")
+        cout << "MOVE "<< PlusX << ' ' << PlusY << ' ' << l<<"\n";
+    else
+        cout << "MOVE "<< x << " 0 "<< l << "\n";
+}
+
+void displayMove(int id, vector<string> &rdrs, int x, int y, int l, bool first) {
+
+    if (fshs.empty()) {
+        MoveDrone(id, x, y, "UP", l, false);
+        return ;
+    }
     map<string, int> mp;
     for(auto &i: rdrs)
         mp[i]++;
-    int check = 0, mn = 1e9;
+    int mn = 1e9, maxElemnts = -1e9;
+    string Direction = "";
     for (auto &i: mp) {
-        if (i.first == "TR" && calcDist(x, y, 9999, 0) < mn) mn = calcDist(x, y, 9999, 0), check = 0;
-        if (i.first == "TL" && calcDist(x, y, 0, 0) < mn) mn = calcDist(x, y, 0, 0), check = 1;
-        if (i.first == "BL" && calcDist(x, y, 0, 9999) < mn) mn = calcDist(x, y, 0, 9999), check = 2;
-        if (i.first == "BR" && calcDist(x, y, 9999, 9999) < mn) mn = calcDist(x, y, 9999, 9999), check = 3;
+        if (i.second >= maxElemnts && i.first == "TR")  Direction = i.first, maxElemnts = i.second;
+        if (i.second >= maxElemnts && i.first == "TL")  Direction = i.first, maxElemnts = i.second;
+        if (i.second >= maxElemnts && i.first == "BL")  Direction = i.first, maxElemnts = i.second;
+        if (i.second >= maxElemnts && i.first == "BR")  Direction = i.first, maxElemnts = i.second;
     }
-    if (fshs.empty())
-        cout << "MOVE "<< x << " 0 "<< l << "\n";
-    else if (check == tr)
-        cout << "MOVE "<< PlusX << ' ' << MinusY << ' ' << l<<"\n";
-    else if (check == tl)
-        cout << "MOVE "<< MinusX << ' ' << MinusY << ' ' << l<<"\n";
-    else if (check == bl)
-        cout << "MOVE "<< MinusX << ' ' << PlusY << ' ' << l<<"\n";
-    else
-        cout << "MOVE "<< PlusX << ' ' << PlusY << ' ' << l<<"\n";
+    cerr << maxElemnts << " and Direction " << Direction << endl;
+    MoveDrone(id, x, y, Direction, l, false);
 }
+
+bool find2Elem(vector<string> &v, string s1, string s2) {
+    return (find(v.begin(), v.end(), s1) != v.end() && find(v.begin(), v.end(), s2) != v.end());
+}
+
+void emergencyMove(int id, map<int, pair<int, int>> &mnstr, int x, int y, map<int, string> &RaMnstr) {
+    for (auto &i: RaMnstr) cerr << i.first << " " << i.second << endl;
+
+    vector<string> s = {"TR", "TL", "BR", "BL"};
+    string sup ="";
+    for (auto &i : mnstr) {
+        cerr << "ID " << id << " i == " << i.first << endl;
+        for (auto j = s.begin(); j != s.end(); ++j) {
+            if (*j == RaMnstr[i.first]) {
+                cerr << "J == " << *j << endl;
+                s.erase(j);
+                sup = RaMnstr[i.first];
+                break;
+            }
+        }
+    }
+    if (s.empty()) MoveDrone(id, x, y, "UP", 0, true);
+    else {
+        if (s.size() == 3) {
+            if (sup == "BR")  MoveDrone(id, x, y, "BL", 0, true);
+            if (sup == "BL")  MoveDrone(id, x, y, "BR", 0, true);
+            if (sup == "TL")  MoveDrone(id, x, y, "TR", 0, true);
+            if (sup == "TR")  MoveDrone(id, x, y, "TL", 0, true);
+        }
+        else
+            MoveDrone(id, x, y, s[0], 0, true);
+    }
+} 
 
 int main()
 {
@@ -144,7 +200,15 @@ int main()
             int creature_vy;
             cin >> creature_id >> creature_x >> creature_y >> creature_vx >> creature_vy; cin.ignore();
             cerr << "VISIBLE CREATURE " << creature_id << endl;
-            if (enemies.count(creature_id)) emergency1=1, emergency2=1;
+            if (enemies.count(creature_id)) {
+                int dstFromId1 = calcDist(creature_x, creature_y, myX1, myY1);
+                int dstFromId2 = calcDist(creature_x, creature_y, myX2, myY2);
+                // int dstFromLight1, dstFromLight12;
+                // if (!l) {
+                // }
+                if (dstFromId1 < dstFromId2) mnstr1.insert({creature_id, {creature_x, creature_y}});
+                else mnstr2.insert({creature_id, {creature_x, creature_y}});
+            }
         }
         int radar_blip_count;
         cin >> radar_blip_count; cin.ignore();
@@ -154,7 +218,6 @@ int main()
             int creature_id;
             string radar;
             cin >> drone_id >> creature_id >> radar; cin.ignore();
-            if (enemies.count(creature_id)) continue;
             if ((drone_id == myID1 || drone_id == myID2) && fshs.count(creature_id)) {
                 if (drone_id == myID1)
                     rdrs1.push_back(radar);
@@ -162,24 +225,24 @@ int main()
                     rdrs2.push_back(radar);
             }
             if (fshs.count(creature_id)) fshs[creature_id] = cnt;
+            if (enemies.count(creature_id)) {
+                if (drone_id == myID1)
+                    RaMnstr1[creature_id] = radar;
+                else RaMnstr2[creature_id] = radar;
+            }
         }
-        cerr << cnt << endl;
         for (auto it=fshs.begin(); it != fshs.end();) {
-            cerr << "( " << it->first<< " " << it->second << " )\n";
             if (it->second != cnt)
                 fshs.erase(it), it = fshs.begin();
             else
                 ++it;
         }
-        if (emergency1)
-            displayMove(rdrs1, myX1, myY1, 0);
-        else
-            displayMove(rdrs1, myX1, myY1, l);
-        if (emergency2)
-            displayMove(rdrs2, myX2, myY2, 0);
-        else
-            displayMove(rdrs2, myX2, myY2, l);
+        if (mnstr1.size()) emergencyMove(myID1, mnstr1, myX1, myY1, RaMnstr1);
+        else displayMove(myID1, rdrs1, myX1, myY1, l, 1);
+
+        if (mnstr2.size()) emergencyMove(myID2, mnstr2, myX2, myY2, RaMnstr2);
+        else displayMove(myID2, rdrs2, myX2, myY2, l, 0);
         l = !l;
-        for (auto &i:fshs) cerr << "FISHES " << i.first << endl;
+        // for (auto &i:fshs) cerr << "FISHES " << i.first << endl;
     }
 }
