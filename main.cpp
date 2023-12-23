@@ -15,6 +15,7 @@ using namespace std;
 map<int, int> fshs;
 set<int> enemies;
 int rndCnt = 0;
+bool firstIsFirst = true;
 struct Monster {
 	int id, x, y, vx, vy;
 	bool inRange(int x, int y, int range) {
@@ -29,12 +30,12 @@ map<int, Monster> mnstr;
 class Drone {
 public:
 	int id, x, y, emergency, battery, light;
-	int Tx, Ty;
+	int FirstTx, FirstTy;
 	bool hitTarget;
 	map<int, string> RaMnstr;
 	vector<string> rdrs;
 	set<int> fishesScaned;
-	Drone():light(0), Ty(3500), hitTarget(0){}
+	Drone():light(0), hitTarget(0){}
 
 
 	pair<int, int> TargetXandY(string Dir) {
@@ -60,10 +61,6 @@ public:
 		if (light || rndCnt < 5) light = 0;
 		else if (battery >= 5) light = 1;
 		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
-		for (auto &i: mnstr) {
-			i.second.x += i.second.vx;
-			i.second.y += i.second.vy;
-		}
 	}
 	void displayMove() {
 		if (fshs.empty() || fishesScaned.size() >= 4) {
@@ -114,10 +111,10 @@ public:
 		// }
 		// emergencyMove(TargetXandY(Direction));
 		if (mnstr.empty()) {
-			MoveDrone({Tx, Ty});
+			MoveDrone({FirstTx, FirstTy});
 			return ;
 		}
-		emergencyMove({Tx, Ty});
+		emergencyMove({FirstTx, FirstTy});
 	}
 
 	bool moveIsGood(int nextX, int nextY) {
@@ -131,7 +128,6 @@ public:
 		T = calcNextLoc(T.first, T.second);
 		map<int, pair<int, int>> mvs;
 		int cnt = 0;
-		//cerr << "EMERGENCY MOVE\n";
 		int tx = T.first, ty = T.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
 		for (;cnt < 20000; cnt++) {
@@ -208,11 +204,12 @@ int main()
         else
             enemies.insert(creature_id);
     }
-	dr1.Tx = 1800, dr2.Tx = 8200;
-	dr1.Ty = 8200, dr2.Ty = 8200;
+	dr1.FirstTx = 1800, dr2.FirstTx = 8200;
+	dr1.FirstTy = 8200, dr2.FirstTy = 8200;
     // game loop
     int l = 0;
     while (1) {
+		map<int, Monster> tmpMnstr;
 		dr1.RaMnstr.clear(), dr2.RaMnstr.clear();
 		dr1.rdrs.clear(), dr2.rdrs.clear();
         rndCnt++;
@@ -251,12 +248,12 @@ int main()
             int battery;
             cin >> drone_id >> drone_x >> drone_y >> emergency >> battery; cin.ignore();
 			if (drone_id == 1 || drone_id == 2) {
+				if (!i) firstIsFirst = false;
                 if(emergency) {
                     for (auto &h:dr2.fishesScaned) fshs[h] = rndCnt;
                     dr2.fishesScaned.clear();
                 }
                 dr2.id = drone_id, dr2.x = drone_x, dr2.y = drone_y, dr2.emergency = emergency, dr2.battery = battery;
-				cerr << "DRONE 2 " << dr2.x << " " << dr2.y << endl;
             }
 			else {
                 if(emergency) {
@@ -264,7 +261,6 @@ int main()
                     dr1.fishesScaned.clear();
                 }
                 dr1.id = drone_id, dr1.x = drone_x, dr1.y = drone_y, dr1.emergency = emergency, dr1.battery = battery;
-				cerr << "DRONE 1 " << dr1.x << " " << dr1.y << endl;
             }
         }
         int foe_drone_count;
@@ -300,7 +296,7 @@ int main()
             cin >> creature_id >> creature_x >> creature_y >> creature_vx >> creature_vy; cin.ignore();
             if (enemies.count(creature_id)) {
 				Monster mn = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
-				mnstr[creature_id] = mn;
+				tmpMnstr[creature_id] = mn;
 				mnstr[creature_id] = mn;
             }
         }
@@ -318,11 +314,11 @@ int main()
                     dr2.rdrs.push_back(radar);
 				fshs[creature_id] = rndCnt;
             }
-            if (enemies.count(creature_id)) {
-                if (drone_id == dr1.id)
-                    dr1.RaMnstr[creature_id] = radar;
-                else dr2.RaMnstr[creature_id] = radar;
-            }
+            // if (enemies.count(creature_id)) {
+            //     if (drone_id == dr1.id)
+            //         dr1.RaMnstr[creature_id] = radar;
+            //     else dr2.RaMnstr[creature_id] = radar;
+            // }
         }
         for (auto it=fshs.begin(); it != fshs.end();) {
             if (it->second != rndCnt)
@@ -330,9 +326,25 @@ int main()
             else
                 ++it;
         }
-		if (dr1.x == dr1.Tx && dr1.y == dr1.Ty) dr1.Ty = 0, dr1.hitTarget = 1;
-		if (dr2.x == dr2.Tx && dr2.y == dr2.Ty) dr2.Ty = 0, dr2.hitTarget = 1;
-        dr1.displayMove();
-        dr2.displayMove();
+		if (dr1.x == dr1.FirstTx && dr1.y == dr1.FirstTy) dr1.hitTarget = 1;
+		if (dr2.x == dr2.FirstTx && dr2.y == dr2.FirstTy) dr2.hitTarget = 1;
+		for (auto &i: mnstr) {
+			if (tmpMnstr.count(i.first))
+				continue;
+			if (i.second.vx + i.second.x < 0)
+				i.second.vx = -i.second.vx;
+			if (i.second.vy + i.second.y < 0)
+				i.second.vy = -i.second.vy;
+			i.second.x += i.second.vx;
+			i.second.y += i.second.vy;
+		}
+		if (firstIsFirst) {
+			dr1.displayMove();
+			dr2.displayMove();
+		}
+		else {
+			dr2.displayMove();
+			dr1.displayMove();
+		}
     }
 }
