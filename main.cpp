@@ -63,7 +63,7 @@ public:
 		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
 	}
 	void displayMove() {
-		if (fshs.empty() || fishesScaned.size() >= 4) {
+		if (fshs.empty() || fishesScaned.size() >= 6) {
 			emergencyMove({x, 499});
 			return ;
 		}
@@ -137,6 +137,7 @@ public:
 			tx = tmp.first, ty = tmp.second;
 		}
 		if (mvs.empty()) {
+			cerr << "NO GOOD MOVE" << endl;
 			MoveDrone(TargetXandY("UP"));
 			return ;
 		}
