@@ -6,11 +6,12 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
-#define DISTANCE 2500
+#define DISTANCE 4000
 #define DRONE_HIT_RANGE 200
-#define UGLY_EAT_RANGE 400
+#define UGLY_EAT_RANGE 300
 #include <ctime>   // for time()
 using namespace std;
+#define PI 3.14159265
 
 map<int, int> fshs;
 set<int> enemies;
@@ -40,8 +41,8 @@ public:
 
 	pair<int, int> TargetXandY(string Dir) {
 		int PlusX, MinusX, PlusY, MinusY;
-		PlusX = min(x + DISTANCE, 9999), MinusX = max(x - DISTANCE, 0);
-		PlusY = min(y + DISTANCE, 9999), MinusY = max(y - DISTANCE, 0);
+		PlusX = min(x + DISTANCE * cos(PI / 4), (double)9999), MinusX = max(x - DISTANCE * cos(PI / 4), (double)0);
+		PlusY = min(y + DISTANCE * sin(PI / 4), (double)9999), MinusY = max(y - DISTANCE * sin(PI / 4), (double)0);
 		int Tx, Ty;
 		if (Dir == "TR")
 			Tx = PlusX, Ty = MinusY;
@@ -64,13 +65,11 @@ public:
 	}
 	void displayMove() {
 		if (fshs.empty() || fishesScaned.size() >= 6) {
+			cerr << "ID " << id << " "<< "Target UP" << endl;
 			emergencyMove({x, 499});
 			return ;
 		}
-		// if (fishesScaned.size() >= 3 && calcDist(x, y, x, 499) < 1000) {
-		// 	emergencyMove({x, 0});
-		// 	return ;
-		// }
+
 		if (hitTarget && !fshs.empty()) {
 			map<string, int> mp;
 			for(auto &i: rdrs)
@@ -78,10 +77,14 @@ public:
 			int mn = 1e9, maxElemnts = -1e9;
 			string Direction = "";
 			for (auto &i: mp) {
-				if (i.second >= maxElemnts && i.first == "TR")  Direction = i.first, maxElemnts = i.second;
-				if (i.second >= maxElemnts && i.first == "TL")  Direction = i.first, maxElemnts = i.second;
-				if (i.second >= maxElemnts && i.first == "BL")  Direction = i.first, maxElemnts = i.second;
-				if (i.second >= maxElemnts && i.first == "BR")  Direction = i.first, maxElemnts = i.second;
+				if (i.second >= maxElemnts && i.first == "TR" && calcDist(x, y, 9999, 0) < mn)
+					mn = calcDist(x, y, 9999, 0), Direction = i.first, maxElemnts = i.second;
+				if (i.second >= maxElemnts && i.first == "TL" && calcDist(x, y, 0, 0) < mn)
+					mn = calcDist(x, y, 0, 0), Direction = i.first, maxElemnts = i.second;
+				if (i.second >= maxElemnts && i.first == "BL" && calcDist(x, y, 0, 9999) < mn)
+					mn = calcDist(x, y, 0, 9999), Direction = i.first, maxElemnts = i.second;
+				if (i.second >= maxElemnts && i.first == "BR" && calcDist(x, y, 9999, 9999) < mn)
+					mn = calcDist(x, y, 9999, 9999), Direction = i.first, maxElemnts = i.second;
 			}
 			if (mnstr.empty()) {
 				MoveDrone(TargetXandY(Direction));
@@ -137,7 +140,7 @@ public:
 			tx = tmp.first, ty = tmp.second;
 		}
 		if (mvs.empty()) {
-			cerr << "NO GOOD MOVE" << endl;
+			cerr << "ID " << id << " " << "No good move" << endl;
 			MoveDrone(TargetXandY("UP"));
 			return ;
 		}
@@ -205,12 +208,12 @@ int main()
         else
             enemies.insert(creature_id);
     }
-	dr1.FirstTx = 1800, dr2.FirstTx = 8200;
-	dr1.FirstTy = 8200, dr2.FirstTy = 8200;
+	dr1.FirstTx = 1850, dr2.FirstTx = 8150;
+	dr1.FirstTy = 8150, dr2.FirstTy = 8150;
     // game loop
     int l = 0;
     while (1) {
-		map<int, Monster> tmpMnstr;
+		set<int> tmpMnstr;
 		dr1.RaMnstr.clear(), dr2.RaMnstr.clear();
 		dr1.rdrs.clear(), dr2.rdrs.clear();
         rndCnt++;
@@ -297,7 +300,7 @@ int main()
             cin >> creature_id >> creature_x >> creature_y >> creature_vx >> creature_vy; cin.ignore();
             if (enemies.count(creature_id)) {
 				Monster mn = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
-				tmpMnstr[creature_id] = mn;
+				tmpMnstr.insert(creature_id);
 				mnstr[creature_id] = mn;
             }
         }
@@ -327,14 +330,15 @@ int main()
             else
                 ++it;
         }
-		if (dr1.x == dr1.FirstTx && dr1.y == dr1.FirstTy) dr1.hitTarget = 1;
-		if (dr2.x == dr2.FirstTx && dr2.y == dr2.FirstTy) dr2.hitTarget = 1;
+		dr1.FirstTx = dr1.x, dr2.FirstTx = dr2.x;
+		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
+		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		for (auto &i: mnstr) {
 			if (tmpMnstr.count(i.first))
 				continue;
-			if (i.second.vx + i.second.x < 0)
+			if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
 				i.second.vx = -i.second.vx;
-			if (i.second.vy + i.second.y < 0)
+			if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
 				i.second.vy = -i.second.vy;
 			i.second.x += i.second.vx;
 			i.second.y += i.second.vy;
