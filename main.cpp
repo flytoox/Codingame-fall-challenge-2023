@@ -65,8 +65,13 @@ public:
 		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
 	}
 	void displayMove() {
-		if (fshs.empty() || fishesScaned.size() >= 5) {
-			cerr << "ID " << id << " "<< "Target UP" << endl;
+		bool Type2Scan = false;
+		for (auto &i:fishesScaned)
+			if (i.second == 2)
+				Type2Scan = true;
+		if (fshs.empty() || fishesScaned.size() >= 5 || (Type2Scan && !hitTarget)) {
+			// cerr << "ID " << id << " "<< "Target UP" << endl;
+			hitTarget = 1;
 			emergencyMove({x, 499});
 			return ;
 		}
@@ -92,11 +97,9 @@ public:
 				if (i.second == Direction)
 					TargetFshsWithRadar.erase(i.first);
 			if (mp.empty()) {
-				cerr << "NO Target Fshs" << endl;
 				emergencyMove(TargetXandY("UP"));
 				return ;
 			}
-			cerr << "ID " << id << " "<< "Target " << Direction << endl;
 			if (mnstr.empty()) {
 				MoveDrone(TargetXandY(Direction));
 				return ;
@@ -337,7 +340,7 @@ int main()
 			else
 				++it;
 		}
-		dr1.FirstTx = dr1.x, dr2.FirstTx = dr2.x;
+		// dr1.FirstTx = dr1.x, dr2.FirstTx = dr2.x;
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		for (auto &i: mnstr) {
