@@ -54,14 +54,22 @@ public:
 			Tx = MinusX, Ty = PlusY;
 		else if (Dir == "BR")
 			Tx = PlusX, Ty = PlusY;
-		else
+		else if (Dir == "UP")
 			Tx = x, Ty = 0;
-		return (calcNextLoc(Tx, Ty));
-		// return {Tx, Ty};
+		else if (Dir == "DOWN")
+			Tx = x, Ty = 9999;
+		else if (Dir == "LEFT")
+			Tx = 0, Ty = y;
+		else if (Dir == "RIGHT")
+			Tx = 9999, Ty = y;
+		else
+			Tx = 0, Ty = 0;
+		// return (calcNextLoc(Tx, Ty));
+		return {Tx, Ty};
 	}
 
 	void MoveDrone(pair<int , int> t) {
-		if (light || rndCnt < 5) light = 0;
+		if (light || rndCnt < 5 || y < 2500) light = 0;
 		else if (battery >= 5) light = 1;
 		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
 	}
@@ -70,14 +78,14 @@ public:
 		for (auto &i:fishesScaned)
 			if (i.second == 2)
 				Type2Scan = true;
-		if (fshs.empty() || fishesScaned.size() >= 5 || (Type2Scan >=2)) {
+		if (fshs.empty() || fishesScaned.size() >= 6 || (Type2Scan >=2)) {
 			// cerr << "ID " << id << " "<< "Target UP" << endl;
 			hitTarget = 1;
 			emergencyMove({x, 499});
 			return ;
 		}
 
-		if (hitTarget && !fshs.empty()) {
+		if (hitTarget) {
 			map<string, int> mp;
 			for(auto &i: rdrs)
 				if (TargetFshsWithRadar.count(i.first))
@@ -101,38 +109,10 @@ public:
 				emergencyMove(TargetXandY("UP"));
 				return ;
 			}
-			if (mnstr.empty()) {
-				MoveDrone(TargetXandY(Direction));
-				return ;
-			}
 			emergencyMove(TargetXandY(Direction));
 			return ;
 		}
-		// map<string, int> mp;
-		// for(auto &i: rdrs)
-		// 	mp[i]++;
-		// int mn = 1e9, maxElemnts = -1e9;
-		// string Direction = "";
-		// for (auto &i: mp) {
-		// 	if (i.second >= maxElemnts && i.first == "TR")  Direction = i.first, maxElemnts = i.second;
-		// 	if (i.second >= maxElemnts && i.first == "TL")  Direction = i.first, maxElemnts = i.second;
-		// 	if (i.second >= maxElemnts && i.first == "BL")  Direction = i.first, maxElemnts = i.second;
-		// 	if (i.second >= maxElemnts && i.first == "BR")  Direction = i.first, maxElemnts = i.second;
-		// }
-		// for (auto &i : mnstr) {
-		// 	//cerr << "MNSTR " << i.second.id << " " << i.second.x << " " << i.second.y << " " << i.second.vx << " " << i.second.vy << endl;
-		// }
-		// //cerr << "DIRECTION " << Direction << " Elements " << maxElemnts << endl;
-		// if (this->mnstr.empty()) {
-		// 	MoveDrone(TargetXandY(Direction));
-		// 	return ;
-		// }
-		// emergencyMove(TargetXandY(Direction));
-		if (mnstr.empty()) {
-			MoveDrone({FirstTx, FirstTy});
-			return ;
-		}
-		emergencyMove({FirstTx, FirstTy});
+		emergencyMove({FirstTx, 8000});
 	}
 
 	bool moveIsGood(int nextX, int nextY) {
@@ -148,7 +128,7 @@ public:
 		// int cnt = 0;
 		int tx = T.first, ty = T.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		const int targetDurationMs = 19;
+		const int targetDurationMs = 20;
     	auto startTime = chrono::high_resolution_clock::now();
 		for (;;) {
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
@@ -170,6 +150,10 @@ public:
 	}
 
 	pair<int, int> calcNextLoc(int Tx, int Ty) {
+		if (Tx > 9999) Tx = 9999;
+		if (Tx < 0) Tx = 0;
+		if (Ty > 9999) Ty = 9999;
+		if (Ty < 0) Ty = 0;
 		int dx = Tx - x, dy = Ty - y;
 		double dist = sqrt(dx * dx + dy * dy);
 		if (dist > 600) {
@@ -209,9 +193,19 @@ public:
 
 Drone dr1, dr2;
 
-
-bool find2Elem(vector<string> &v, string s1, string s2) {
-    return (find(v.begin(), v.end(), s1) != v.end() && find(v.begin(), v.end(), s2) != v.end());
+void updateMonster(set<int> &tmpMnstr) {
+	for (auto &i: mnstr) {
+		if (tmpMnstr.count(i.first))
+			continue;
+		if (calcDist(i.second.x, i.second.y, i.second.x + i.second.vx, i.second.y + i.second.vy) > 270)
+			i.second.vx *=  270.0 / 540.0, i.second.vy *= 270.0 / 540.0;
+		if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
+			i.second.vx = -i.second.vx;
+		if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
+			i.second.vy = -i.second.vy;
+		i.second.x += i.second.vx;
+		i.second.y += i.second.vy;
+	}
 }
 
 
@@ -230,10 +224,9 @@ int main()
         else
             enemies.insert(creature_id);
     }
-	dr1.FirstTx = 1800, dr2.FirstTx = 8000;
-	dr1.FirstTy = 7600, dr2.FirstTy = 7600;
+	dr1.FirstTy = 7400, dr2.FirstTy = 7400;
+	dr1.FirstTx = 2500, dr2.FirstTx = 7500;
     // game loop
-    int l = 0;
     while (1) {
 		TargetFshsWithRadar.clear();
 		set<int> tmpMnstr;
@@ -348,26 +341,13 @@ int main()
 			else
 				++it;
 		}
-		// dr1.FirstTx = dr1.x, dr2.FirstTx = dr2.x;
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
-		for (auto &i: mnstr) {
-			if (tmpMnstr.count(i.first))
-				continue;
-			if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
-				i.second.vx = -i.second.vx;
-			if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
-				i.second.vy = -i.second.vy;
-			i.second.x += i.second.vx;
-			i.second.y += i.second.vy;
-		}
-		if (firstIsFirst) {
-			dr1.displayMove();
-			dr2.displayMove();
-		}
-		else {
-			dr2.displayMove();
-			dr1.displayMove();
-		}
+		updateMonster(tmpMnstr);
+		if (firstIsFirst) 
+			dr1.displayMove(), dr2.displayMove();
+		else 
+			dr2.displayMove(), dr1.displayMove();
+		
     }
 }
