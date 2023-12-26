@@ -5,6 +5,7 @@
 #include <map>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <set>
 #define DISTANCE 4000
 #define DRONE_HIT_RANGE 200
@@ -69,7 +70,7 @@ public:
 		for (auto &i:fishesScaned)
 			if (i.second == 2)
 				Type2Scan = true;
-		if (fshs.empty() || fishesScaned.size() >= 5 || (Type2Scan && !hitTarget)) {
+		if (fshs.empty() || fishesScaned.size() >= 5 || (Type2Scan >=2)) {
 			// cerr << "ID " << id << " "<< "Target UP" << endl;
 			hitTarget = 1;
 			emergencyMove({x, 499});
@@ -144,11 +145,18 @@ public:
 	void emergencyMove(pair<int, int> T) {
 		T = calcNextLoc(T.first, T.second);
 		map<int, pair<int, int>> mvs;
-		int cnt = 0;
+		// int cnt = 0;
 		int tx = T.first, ty = T.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		for (;cnt < 20000; cnt++) {
+		const int targetDurationMs = 19;
+    	auto startTime = chrono::high_resolution_clock::now();
+		for (;;) {
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
+			auto currentTime = chrono::high_resolution_clock::now();
+			auto elapsedTime = chrono::duration_cast<chrono::milliseconds>(currentTime - startTime).count();
+			if (elapsedTime >= targetDurationMs) {
+				break;
+			}
 			tx = rand() % 10000, ty = rand() % 10000;
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
@@ -222,8 +230,8 @@ int main()
         else
             enemies.insert(creature_id);
     }
-	dr1.FirstTx = 1850, dr2.FirstTx = 8000;
-	dr1.FirstTy = 8150, dr2.FirstTy = 8000;
+	dr1.FirstTx = 1800, dr2.FirstTx = 8000;
+	dr1.FirstTy = 7600, dr2.FirstTy = 7600;
     // game loop
     int l = 0;
     while (1) {
