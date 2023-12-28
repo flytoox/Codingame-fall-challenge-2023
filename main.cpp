@@ -14,11 +14,15 @@
 using namespace std;
 #define PI 3.14159265
 
-map<int, int> fshs;
+map<int, int> fshs, enemyFshs;
 set<int> TargetFshsWithRadar;
 set<int> Mnstrs;
 int rndCnt = 0;
 bool firstIsFirst = true;
+typedef struct Fish {
+	int id, x, y, vx, vy, type;
+} Fish;
+map<int, Fish> fishes;
 struct Monster {
 	int id, x, y, vx, vy;
 	bool inRange(int x, int y, int range) {
@@ -73,46 +77,35 @@ public:
 		else if (battery >= 5) light = 1;
 		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
 	}
-	void targetWithRdr(map<int, string> &rdrs, bool TargetEnemy) {
-		map<string, int> mp;
-		for(auto &i: rdrs)
-			if (TargetFshsWithRadar.count(i.first) || TargetEnemy)
-				mp[i.second]++;
-		int mn = 1e9, maxElemnts = -1e9;
-		string Direction = "";
-		for (auto &i: mp) {
-			if (i.second >= maxElemnts && i.first == "TR" && calcDist(x, y, 9999, 0) < mn)
-				mn = calcDist(x, y, 9999, 0), Direction = i.first, maxElemnts = i.second;
-			if (i.second >= maxElemnts && i.first == "TL" && calcDist(x, y, 0, 0) < mn)
-				mn = calcDist(x, y, 0, 0), Direction = i.first, maxElemnts = i.second;
-			if (i.second >= maxElemnts && i.first == "BL" && calcDist(x, y, 0, 9999) < mn)
-				mn = calcDist(x, y, 0, 9999), Direction = i.first, maxElemnts = i.second;
-			if (i.second >= maxElemnts && i.first == "BR" && calcDist(x, y, 9999, 9999) < mn)
-				mn = calcDist(x, y, 9999, 9999), Direction = i.first, maxElemnts = i.second;
+	void targetWithRdr(map<int,int> &TrgetCreatures) {
+
+		int mx = 1e9, id;
+		for (auto &i: fishes) {
+			if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
+				mx = calcDist(x, y, i.second.x, i.second.y);
+				id = i.first;
+			}
 		}
-		if (!TargetEnemy) {
-			for (auto &i: rdrs)
-				if (i.second == Direction)
-					TargetFshsWithRadar.erase(i.first);
-		}
-		if (mp.empty()) {
+
+		if (TrgetCreatures.empty()) {
 			emergencyMove(TargetXandY("UP"));
 			return ;
 		}
-		emergencyMove(TargetXandY(Direction));
+		emergencyMove({fishes[id].x, fishes[id].y});
 	}
+
 	void displayMove() {
 		if (ScanedAll) {
-			targetWithRdr(EnemyFshsRdr, true);
+			targetWithRdr(enemyFshs);
 			return ;
 		}
-		if (fshs.empty() || fishesScaned.size() >= 6) {
+		if (fshs.empty() || fishesScaned.size() >= 5) {
 			hitTarget = 1;
 			return (emergencyMove({x, 499}));
 		}
 
 		if (hitTarget) {
-			targetWithRdr(rdrs, false);
+			targetWithRdr(fshs);
 			return ;
 		}
 		emergencyMove({FirstTx, 8000});
@@ -126,9 +119,9 @@ public:
 	}
 
 	void emergencyMove(pair<int, int> T) {
-		T = calcNextLoc(T.first, T.second);
+		auto T1 = calcNextLoc(T.first, T.second);
 		map<int, pair<int, int>> mvs;
-		int tx = T.first, ty = T.second;
+		int tx = T1.first, ty = T1.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
 		const int targetDurationMs = 20;
     	auto startTime = chrono::high_resolution_clock::now();
@@ -190,14 +183,10 @@ public:
 	}
 };
 
-typedef struct Fish {
-	int id, x, y, vx, vy, type;
-} Fish;
 
 
 Drone dr1, dr2;
 set<int> enemySaved;
-map<int, Fish> fishes;
 
 void updateMonster(set<int> &tmpMnstr) {
 	for (auto &i: mnstr) {
@@ -211,7 +200,6 @@ void updateMonster(set<int> &tmpMnstr) {
 			i.second.x += i.second.vx;
 			i.second.y += i.second.vy;
 		}
-		cerr << i.second.id << " " << i.second.x << " " << i.second.y << endl;
 	}
 }
 
@@ -228,7 +216,6 @@ void calcFishPos() {
 		}
 		else
 			i.second.x = (Tmp1.x / 2);
-		cerr << i.second.id << " " << i.second.x << " " << i.second.y << endl;
 	}
 }
 
@@ -249,6 +236,7 @@ int main()
         else
             Mnstrs.insert(creature_id);
     }
+	enemyFshs = fshs;
 	dr1.FirstTy = 7400, dr2.FirstTy = 7400;
 	dr1.FirstTx = 2500, dr2.FirstTx = 7500;
     while (1) {
@@ -285,7 +273,7 @@ int main()
         for (int i = 0; i < foe_scan_count; i++) {
             int creature_id;
             cin >> creature_id; cin.ignore();
-			enemySaved.insert(creature_id);
+			enemyFshs.erase(creature_id);
         }
         int my_drone_count;
         cin >> my_drone_count; cin.ignore();
@@ -348,10 +336,8 @@ int main()
 				Monster mn = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
 				tmpMnstr.insert(creature_id);
 				mnstr[creature_id] = mn;
-				cerr << "Monster " << creature_id << " " << creature_x << " " << creature_y << " " << creature_vx << " " << creature_vy << endl;
-            }
+			}
         }
-		dr1.EnemyFshsRdr.clear(), dr2.EnemyFshsRdr.clear();
         int radar_blip_count;
         cin >> radar_blip_count; cin.ignore();
         for (int i = 0; i < radar_blip_count; i++) {
@@ -359,18 +345,13 @@ int main()
             int creature_id;
             string radar;
             cin >> drone_id >> creature_id >> radar; cin.ignore();
-            if (fshs.count(creature_id)) {
+            if (!Mnstrs.count(creature_id)) {
                 if (drone_id == dr1.id)
                     dr1.rdrs[creature_id] = radar;
                 else
                     dr2.rdrs[creature_id] = radar;
 				TargetFshsWithRadar.insert(creature_id);
-            } else if (!enemySaved.count(creature_id)) {
-				if (drone_id == dr1.id)
-					dr1.EnemyFshsRdr[creature_id] = radar;
-				else
-					dr2.EnemyFshsRdr[creature_id] = radar;
-			}
+            }
         }
 		for (auto it = fshs.begin();it != fshs.end();) {
 			if (!TargetFshsWithRadar.count(it->first))
