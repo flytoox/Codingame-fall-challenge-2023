@@ -73,10 +73,11 @@ public:
 	}
 
 	void MoveDrone(pair<int , int> t) {
-		if (light || rndCnt < 5 || y < 2500) light = 0;
+		if ((light && y < 6550) || rndCnt < 5 || y < 3000) light = 0;
 		else if (battery >= 5) light = 1;
-		cout << "MOVE " << t.first << " " << t.second << " " << this->light << endl;
+		cout << "MOVE " << t.first << " " << t.second << " " << light << endl;
 	}
+
 	void targetWithRdr(map<int,int> &TrgetCreatures) {
 
 		int mx = 1e9, id;
@@ -115,6 +116,30 @@ public:
 		for (auto &i: mnstr) {
 			if (this->getCollision(i.second, nextX, nextY)) return false;
 		}
+		// auto TmpMnst = mnstr;
+		// for (auto &i: TmpMnst) {
+		// 	if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
+		// 		i.second.vx = -i.second.vx;
+		// 	if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
+		// 		i.second.vy = -i.second.vy;
+		// 	i.second.x += i.second.vx;
+		// 	i.second.y += i.second.vy;
+		// }
+		// int tmpX = x, tmpY = y;
+		// x = nextX, y = nextY;
+		// for (int i = 0; i < 200; i++) {
+		// 	double theta = 2 * PI * i / 200;
+		// 	int tx = round(x + 601 * cos(theta));
+		// 	int ty = round(y + 601 * sin(theta));
+		// 	auto tmp = calcNextLoc(tx, ty);
+		// 	tx = tmp.first, ty = tmp.second;
+		// 	for (auto &j: TmpMnst)
+		// 		if (this->getCollision(j.second, tx, ty)) {
+		// 			x = tmpX, y = tmpY;
+		// 			return false;
+		// 		}
+		// }
+		// x = tmpX, y = tmpY;
 		return true;
 	}
 
@@ -123,19 +148,14 @@ public:
 		map<int, pair<int, int>> mvs;
 		int tx = T1.first, ty = T1.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		const int targetDurationMs = 20;
-    	auto startTime = chrono::high_resolution_clock::now();
-		for (;;) {
-			auto currentTime = chrono::high_resolution_clock::now();
-			auto elapsedTime = chrono::duration_cast<chrono::milliseconds>(currentTime - startTime).count();
-			if (elapsedTime >= targetDurationMs) {
-				break;
-			}
-			tx = rand() % 10000, ty = rand() % 10000;
+		for (int i = 0; i < 500; i++) {
+			double theta = 2 * PI * i / 500;
+			tx = round(x + 601 * cos(theta));
+			ty = round(y + 601 * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
-		}
+    	}
 		if (mvs.empty()) {
 			MoveDrone(TargetXandY("UP"));
 			return ;
@@ -216,6 +236,21 @@ void calcFishPos() {
 		}
 		else
 			i.second.x = (Tmp1.x / 2);
+	}
+	for (auto &i: fishes) {
+		Drone Tmp1 = dr1, Tmp2 = dr2;
+		if (Tmp1.y > Tmp2.y) swap(Tmp1, Tmp2);
+		if (Tmp1.rdrs[i.first] == "BL" || Tmp1.rdrs[i.first] == "BR") {
+			if (Tmp2.rdrs[i.first] == "BL" || Tmp2.rdrs[i.first] == "BR")
+				i.second.y = ((9999 - Tmp2.y) / 2) + Tmp2.y;
+			else
+				i.second.y = Tmp2.y - ((Tmp2.y - Tmp1.y) / 2);
+		}
+		else
+			i.second.y = (Tmp1.y / 2);
+		if (i.second.type == 0) i.second.y = min(i.second.y, 4999), i.second.y = max(i.second.y, 2499);
+		else if (i.second.type == 1) i.second.y = min(i.second.y, 7499), i.second.y = max(i.second.y, 4999);
+		else if (i.second.type == 2) i.second.y = min(i.second.y, 9999), i.second.y = max(i.second.y, 7499);
 	}
 }
 
