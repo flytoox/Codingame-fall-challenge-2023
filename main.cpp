@@ -9,7 +9,7 @@
 #include <set>
 #define DISTANCE 3000
 #define DRONE_HIT_RANGE 200
-#define UGLY_EAT_RANGE 305
+#define UGLY_EAT_RANGE 304
 #include <ctime>   // for time()
 using namespace std;
 #define PI 3.14159265
@@ -36,7 +36,7 @@ int calcDist(int x1, int y1, int x2, int y2) {
 map<int, Monster> mnstr;
 class Drone {
 public:
-	int id, x, y, emergency, battery, light;
+	int id, x, y, emergency, battery, light, TargetUp = 0;
 	int FirstTx, FirstTy;
 	bool hitTarget;
 	map<int, string> EnemyFshsRdr;
@@ -45,6 +45,12 @@ public:
 	bool ScanedAll = false;
 	Drone():light(0), hitTarget(0){}
 
+	void PrntErr() {
+		cerr << "id: " << id << endl;
+		cerr << "fishesScaned: " << endl;
+		for (auto &i: fishesScaned) cerr << i.first << " " << i.second << endl;
+		cerr << "---" << endl;
+	}
 
 	pair<int, int> TargetXandY(string Dir) {
 		int PlusX, MinusX, PlusY, MinusY;
@@ -96,13 +102,15 @@ public:
 	}
 
 	void displayMove() {
+		if (y == 500) TargetUp = 0;
 		if (ScanedAll) {
 			targetWithRdr(enemyFshs);
 			return ;
 		}
-		if (fshs.empty() || fishesScaned.size() >= 5) {
+		if (fshs.empty() || fishesScaned.size() >= 5 || TargetUp) {
 			hitTarget = 1;
-			return (emergencyMove({x, 499}));
+			TargetUp = 1;
+			return (emergencyMove({x, 500}));
 		}
 
 		if (hitTarget) {
@@ -148,8 +156,8 @@ public:
 		map<int, pair<int, int>> mvs;
 		int tx = T1.first, ty = T1.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		for (int i = 0; i < 500; i++) {
-			double theta = 2 * PI * i / 500;
+		for (int i = 0; i < 10000; i++) {
+			double theta = 2 * PI * i / 10000;
 			tx = round(x + 601 * cos(theta));
 			ty = round(y + 601 * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
@@ -211,8 +219,8 @@ set<int> enemySaved;
 void updateMonster(set<int> &tmpMnstr) {
 	for (auto &i: mnstr) {
 		if (!tmpMnstr.count(i.first)) {
-			if (calcDist(i.second.x, i.second.y, i.second.x + i.second.vx, i.second.y + i.second.vy) > 270)
-				i.second.vx *=  270.0 / 540.0, i.second.vy *= 270.0 / 540.0;
+			int speed = calcDist(i.second.x, i.second.y, i.second.x + i.second.vx, i.second.y + i.second.vy);
+			i.second.vx *=  270.0 / speed, i.second.vy *= 270.0 / speed;
 			if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
 				i.second.vx = -i.second.vx;
 			if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
@@ -303,6 +311,9 @@ int main()
 			if (dr2.fishesScaned.empty() )
 				dr2.ScanedAll = true;
 		}
+		else dr2.ScanedAll = dr1.ScanedAll = false;
+		if (!dr1.fishesScaned.empty()) dr1.ScanedAll = false;
+		if (!dr2.fishesScaned.empty()) dr2.ScanedAll = false;
         int foe_scan_count;
         cin >> foe_scan_count; cin.ignore();
         for (int i = 0; i < foe_scan_count; i++) {
@@ -352,7 +363,7 @@ int main()
             int creature_id;
             cin >> drone_id >> creature_id; cin.ignore();
             if ((drone_id == dr1.id || drone_id == dr2.id) && fshs.count(creature_id)) {
-                if (drone_id == dr1.id) dr1.fishesScaned[creature_id]=fshs[creature_id];
+                if (drone_id == dr1.id ) dr1.fishesScaned[creature_id]=fshs[creature_id];
                 else dr2.fishesScaned[creature_id]=fshs[creature_id];
                 fshs.erase(creature_id);
             }
@@ -402,5 +413,6 @@ int main()
 			dr1.displayMove(), dr2.displayMove();
 		else 
 			dr2.displayMove(), dr1.displayMove();
+		dr1.PrntErr(), dr2.PrntErr();
     }
 }
