@@ -9,10 +9,9 @@
 #include <set>
 #define DISTANCE 3000
 #define DRONE_HIT_RANGE 200
-#define UGLY_EAT_RANGE 304
-#include <ctime>   // for time()
+#define UGLY_EAT_RANGE 303
 using namespace std;
-#define PI 3.14159265
+#define PI 3.14159265358979323846
 
 map<int, int> fshs, enemyFshs;
 set<int> TargetFshsWithRadar;
@@ -84,7 +83,7 @@ public:
 		cout << "MOVE " << t.first << " " << t.second << " " << light << endl;
 	}
 
-	void targetWithRdr(map<int,int> &TrgetCreatures) {
+	void targetWithRdr(map<int,int> &TrgetCreatures, bool Enemy) {
 
 		int mx = 1e9, id;
 		for (auto &i: fishes) {
@@ -93,18 +92,22 @@ public:
 				id = i.first;
 			}
 		}
-
 		if (TrgetCreatures.empty()) {
 			emergencyMove(TargetXandY("UP"));
 			return ;
 		}
-		emergencyMove({fishes[id].x, fishes[id].y});
+		int tx = fishes[id].x, ty = fishes[id].y;
+		if (Enemy) {
+			if (tx < 5000) tx += 500;
+			else tx -= 500;
+		}
+		emergencyMove({tx, ty});
 	}
 
 	void displayMove() {
 		if (y == 500) TargetUp = 0;
 		if (ScanedAll) {
-			targetWithRdr(enemyFshs);
+			targetWithRdr(enemyFshs, 1);
 			return ;
 		}
 		if (fshs.empty() || fishesScaned.size() >= 5 || TargetUp) {
@@ -114,7 +117,7 @@ public:
 		}
 
 		if (hitTarget) {
-			targetWithRdr(fshs);
+			targetWithRdr(fshs, 0);
 			return ;
 		}
 		emergencyMove({FirstTx, 8000});
@@ -135,10 +138,10 @@ public:
 		// }
 		// int tmpX = x, tmpY = y;
 		// x = nextX, y = nextY;
-		// for (int i = 0; i < 200; i++) {
-		// 	double theta = 2 * PI * i / 200;
-		// 	int tx = round(x + 601 * cos(theta));
-		// 	int ty = round(y + 601 * sin(theta));
+		// for (int i = 0; i < 360; i++) {
+		// 	double theta = 2 * PI * i / 360;
+		// 	int tx = round(x + 605 * cos(theta));
+		// 	int ty = round(y + 605 * sin(theta));
 		// 	auto tmp = calcNextLoc(tx, ty);
 		// 	tx = tmp.first, ty = tmp.second;
 		// 	for (auto &j: TmpMnst)
@@ -156,12 +159,13 @@ public:
 		map<int, pair<int, int>> mvs;
 		int tx = T1.first, ty = T1.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		for (int i = 0; i < 10000; i++) {
-			double theta = 2 * PI * i / 10000;
-			tx = round(x + 601 * cos(theta));
-			ty = round(y + 601 * sin(theta));
+		for (int i = 0; i < 15000; i++) {
+			double theta = 2 * PI * i / 15000;
+			tx = round(x + 605 * cos(theta));
+			ty = round(y + 605 * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
+			if (!tx || !ty || tx >= 9999 || ty >= 9999) continue;
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
@@ -216,26 +220,26 @@ public:
 Drone dr1, dr2;
 set<int> enemySaved;
 
-void updateMonster(set<int> &tmpMnstr) {
+void updateMonster() {
 	for (auto &i: mnstr) {
-		if (!tmpMnstr.count(i.first)) {
-			int speed = calcDist(i.second.x, i.second.y, i.second.x + i.second.vx, i.second.y + i.second.vy);
-			i.second.vx *=  270.0 / speed, i.second.vy *= 270.0 / speed;
-			if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
-				i.second.vx = -i.second.vx;
-			if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
-				i.second.vy = -i.second.vy;
-			i.second.x += i.second.vx;
-			i.second.y += i.second.vy;
-		}
+		int speed = calcDist(i.second.x, i.second.y, i.second.x + i.second.vx, i.second.y + i.second.vy);
+		if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
+			i.second.vx = -i.second.vx;
+		if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
+			i.second.vy = -i.second.vy;
+		i.second.x += i.second.vx;
+		i.second.y += i.second.vy;
+		if (speed)
+			i.second.vx *=  round(270.0 / speed), i.second.vy *= round(270.0 / speed);
 	}
 }
 
 
-void calcFishPos() {
+void calcFishPos(set<int> &DontUpdateThisFishes) {
+	Drone Tmp1 = dr1, Tmp2 = dr2;
+	if (Tmp1.x > Tmp2.x) swap(Tmp1, Tmp2);
 	for (auto &i: fishes) {
-		Drone Tmp1 = dr1, Tmp2 = dr2;
-		if (Tmp1.x > Tmp2.x) swap(Tmp1, Tmp2);
+		if (DontUpdateThisFishes.count(i.first)) continue;
 		if (Tmp1.rdrs[i.first] == "BR" || Tmp1.rdrs[i.first] == "TR") {
 			if (Tmp2.rdrs[i.first] == "BR" || Tmp2.rdrs[i.first] == "TR")
 				i.second.x = ((9999 - Tmp2.x) / 2) + Tmp2.x;
@@ -245,9 +249,9 @@ void calcFishPos() {
 		else
 			i.second.x = (Tmp1.x / 2);
 	}
+	if (Tmp1.y > Tmp2.y) swap(Tmp1, Tmp2);
 	for (auto &i: fishes) {
-		Drone Tmp1 = dr1, Tmp2 = dr2;
-		if (Tmp1.y > Tmp2.y) swap(Tmp1, Tmp2);
+		if (DontUpdateThisFishes.count(i.first)) continue;
 		if (Tmp1.rdrs[i.first] == "BL" || Tmp1.rdrs[i.first] == "BR") {
 			if (Tmp2.rdrs[i.first] == "BL" || Tmp2.rdrs[i.first] == "BR")
 				i.second.y = ((9999 - Tmp2.y) / 2) + Tmp2.y;
@@ -264,7 +268,6 @@ void calcFishPos() {
 
 int main()
 {
-	srand(time(0));
     int creature_count;
     cin >> creature_count; cin.ignore();
     for (int i = 0; i < creature_count; i++) {
@@ -280,9 +283,10 @@ int main()
             Mnstrs.insert(creature_id);
     }
 	enemyFshs = fshs;
-	dr1.FirstTy = 7400, dr2.FirstTy = 7400;
+	dr1.FirstTy = 7100, dr2.FirstTy = 7100;
 	dr1.FirstTx = 2500, dr2.FirstTx = 7500;
     while (1) {
+		updateMonster();
 		TargetFshsWithRadar.clear();
 		dr1.rdrs.clear(), dr2.rdrs.clear();
         rndCnt++;
@@ -368,7 +372,7 @@ int main()
                 fshs.erase(creature_id);
             }
         }
-		set<int> tmpMnstr;
+		set<int> DontUpdateThisFishes;
         int visible_creature_count;
         cin >> visible_creature_count; cin.ignore();
         for (int i = 0; i < visible_creature_count; i++) {
@@ -378,10 +382,14 @@ int main()
             int creature_vx;
             int creature_vy;
             cin >> creature_id >> creature_x >> creature_y >> creature_vx >> creature_vy; cin.ignore();
-            if (Mnstrs.count(creature_id)) {
-				Monster mn = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
-				tmpMnstr.insert(creature_id);
-				mnstr[creature_id] = mn;
+            if (Mnstrs.count(creature_id))
+				mnstr[creature_id] = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
+			else {
+				DontUpdateThisFishes.insert(creature_id);
+				fishes[creature_id].x = creature_x;
+				fishes[creature_id].y = creature_y;
+				fishes[creature_id].vx = creature_vx;
+				fishes[creature_id].vy = creature_vy;
 			}
         }
         int radar_blip_count;
@@ -401,18 +409,17 @@ int main()
         }
 		for (auto it = fshs.begin();it != fshs.end();) {
 			if (!TargetFshsWithRadar.count(it->first))
-				it = fshs.erase(it);
+				fishes.erase(it->first), it = fshs.erase(it);
 			else
 				++it;
 		}
-		calcFishPos();
+		calcFishPos(DontUpdateThisFishes);
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
-		updateMonster(tmpMnstr);
+		// dr1.PrntErr(), dr2.PrntErr();
 		if (firstIsFirst) 
 			dr1.displayMove(), dr2.displayMove();
 		else 
 			dr2.displayMove(), dr1.displayMove();
-		dr1.PrntErr(), dr2.PrntErr();
     }
 }
