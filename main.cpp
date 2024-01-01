@@ -7,12 +7,12 @@
 #include <cmath>
 #include <chrono>
 #include <set>
-#define DISTANCE 3000
 #define DRONE_HIT_RANGE 200
-#define UGLY_EAT_RANGE 303
+#define UGLY_EAT_RANGE 305
 using namespace std;
 #define PI 3.14159265358979323846
 
+int targetFsh;
 map<int, int> fshs, enemyFshs;
 set<int> TargetFshsWithRadar;
 set<int> Mnstrs;
@@ -51,52 +51,28 @@ public:
 		cerr << "---" << endl;
 	}
 
-	pair<int, int> TargetXandY(string Dir) {
-		int PlusX, MinusX, PlusY, MinusY;
-		PlusX = min(x + DISTANCE * cos(PI / 4), (double)9999), MinusX = max(x - DISTANCE * cos(PI / 4), (double)0);
-		PlusY = min(y + DISTANCE * sin(PI / 4), (double)9999), MinusY = max(y - DISTANCE * sin(PI / 4), (double)0);
-		int Tx, Ty;
-		if (Dir == "TR")
-			Tx = PlusX, Ty = MinusY;
-		else if (Dir == "TL")
-			Tx = MinusX, Ty = MinusY;
-		else if (Dir == "BL")
-			Tx = MinusX, Ty = PlusY;
-		else if (Dir == "BR")
-			Tx = PlusX, Ty = PlusY;
-		else if (Dir == "UP")
-			Tx = x, Ty = 0;
-		else if (Dir == "DOWN")
-			Tx = x, Ty = 9999;
-		else if (Dir == "LEFT")
-			Tx = 0, Ty = y;
-		else if (Dir == "RIGHT")
-			Tx = 9999, Ty = y;
-		else
-			Tx = 0, Ty = 0;
-		return (calcNextLoc(Tx, Ty));
-	}
-
 	void MoveDrone(pair<int , int> t) {
-		if ((light && y < 6550) || rndCnt < 5 || y < 3000) light = 0;
+		if ((light && y < 6200) || rndCnt < 5 || y < 3000) light = 0;
 		else if (battery >= 5) light = 1;
 		cout << "MOVE " << t.first << " " << t.second << " " << light << endl;
 	}
 
 	void targetWithRdr(map<int,int> &TrgetCreatures, bool Enemy) {
 
-		int mx = 1e9, id;
+		int mx = 1e9, id = -1;
 		for (auto &i: fishes) {
-			if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
+			if (targetFsh != i.first && TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
 				mx = calcDist(x, y, i.second.x, i.second.y);
 				id = i.first;
 			}
 		}
-		if (TrgetCreatures.empty()) {
-			emergencyMove(TargetXandY("UP"));
+		if (TrgetCreatures.empty() || id == -1) {
+			ScanedAll = true;
+			emergencyMove({x, 500});
 			return ;
 		}
 		int tx = fishes[id].x, ty = fishes[id].y;
+		targetFsh = id;
 		if (Enemy) {
 			if (tx < 5000) tx += 500;
 			else tx -= 500;
@@ -105,6 +81,10 @@ public:
 	}
 
 	void displayMove() {
+		if (emergency) {
+			cout << "MOVE 0 0 0 GAY DRONE\n";
+			return ;
+		}
 		if (y == 500) TargetUp = 0;
 		if (ScanedAll) {
 			targetWithRdr(enemyFshs, 1);
@@ -127,31 +107,40 @@ public:
 		for (auto &i: mnstr) {
 			if (this->getCollision(i.second, nextX, nextY)) return false;
 		}
-		// auto TmpMnst = mnstr;
-		// for (auto &i: TmpMnst) {
-		// 	if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
-		// 		i.second.vx = -i.second.vx;
-		// 	if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
-		// 		i.second.vy = -i.second.vy;
-		// 	i.second.x += i.second.vx;
-		// 	i.second.y += i.second.vy;
-		// }
-		// int tmpX = x, tmpY = y;
-		// x = nextX, y = nextY;
-		// for (int i = 0; i < 360; i++) {
-		// 	double theta = 2 * PI * i / 360;
-		// 	int tx = round(x + 605 * cos(theta));
-		// 	int ty = round(y + 605 * sin(theta));
-		// 	auto tmp = calcNextLoc(tx, ty);
-		// 	tx = tmp.first, ty = tmp.second;
-		// 	for (auto &j: TmpMnst)
-		// 		if (this->getCollision(j.second, tx, ty)) {
-		// 			x = tmpX, y = tmpY;
-		// 			return false;
-		// 		}
-		// }
-		// x = tmpX, y = tmpY;
-		return true;
+		int tmpX = x, tmpY = y;
+		x = nextX, y = nextY;
+		auto TmpMnst = mnstr;
+		for (auto &i: TmpMnst) {
+			if (i.second.vx + i.second.x < 0 || i.second.vx + i.second.x > 9999)
+				i.second.vx = -i.second.vx;
+			if (i.second.vy + i.second.y < 0 || i.second.vy + i.second.y > 9999 || i.second.y + i.second.vy < 2500)
+				i.second.vy = -i.second.vy;
+			i.second.x += i.second.vx;
+			i.second.y += i.second.vy;
+			double Xx = x - i.second.x, Yy = y - i.second.y;
+			double length = sqrt(Xx * Xx + Yy * Yy);
+			if (length > 540)
+				Xx = Xx / length, Yy = Yy / length, i.second.vx = round(Xx * 540), i.second.vy = round(Yy * 540);
+			else
+				i.second.vx = round(Xx), i.second.vy = round(Yy);
+		}
+		for (int i = 0; i < 300; i++) {
+			bool flag = true;
+			double theta = 2 * PI * i / 300;
+			int tx = round(x + 601 * cos(theta));
+			int ty = round(y + 601 * sin(theta));
+			auto tmp = calcNextLoc(tx, ty);
+			tx = tmp.first, ty = tmp.second;
+			for (auto &j: TmpMnst) {
+				if (this->getCollision(j.second, tx, ty)) {
+					flag = false;
+					break;
+				}
+			}
+			if (flag) return (x = tmpX, y = tmpY, true);
+		}
+		x = tmpX, y = tmpY;
+		return false;
 	}
 
 	void emergencyMove(pair<int, int> T) {
@@ -159,17 +148,18 @@ public:
 		map<int, pair<int, int>> mvs;
 		int tx = T1.first, ty = T1.second;
 		if (moveIsGood(tx, ty)) return MoveDrone({tx, ty});
-		for (int i = 0; i < 15000; i++) {
-			double theta = 2 * PI * i / 15000;
-			tx = round(x + 605 * cos(theta));
-			ty = round(y + 605 * sin(theta));
+		for (int i = 0; i < 300; i++) {
+			double theta = 2 * PI * i / 300;
+			tx = round(x + 601 * cos(theta));
+			ty = round(y + 601 * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
 			if (!tx || !ty || tx >= 9999 || ty >= 9999) continue;
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
-			MoveDrone(TargetXandY("UP"));
+			cerr << "NO WAY OUT\n";
+			MoveDrone({x, 500});
 			return ;
 		}
 		MoveDrone(mvs.begin()->second);
@@ -283,9 +273,10 @@ int main()
             Mnstrs.insert(creature_id);
     }
 	enemyFshs = fshs;
-	dr1.FirstTy = 7100, dr2.FirstTy = 7100;
-	dr1.FirstTx = 2500, dr2.FirstTx = 7500;
+	dr1.FirstTy = 7200, dr2.FirstTy = 7200;
+	dr1.FirstTx = 2000, dr2.FirstTx = 8000;
     while (1) {
+		targetFsh = -1;
 		updateMonster();
 		TargetFshsWithRadar.clear();
 		dr1.rdrs.clear(), dr2.rdrs.clear();
@@ -315,7 +306,6 @@ int main()
 			if (dr2.fishesScaned.empty() )
 				dr2.ScanedAll = true;
 		}
-		else dr2.ScanedAll = dr1.ScanedAll = false;
 		if (!dr1.fishesScaned.empty()) dr1.ScanedAll = false;
 		if (!dr2.fishesScaned.empty()) dr2.ScanedAll = false;
         int foe_scan_count;
