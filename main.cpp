@@ -58,14 +58,14 @@ public:
 
 	void targetWithRdr(map<int,int> &TrgetCreatures, bool Enemy) {
 
-		int mx = 1e9, id = -1;
-		for (auto &i: fishes) {
-			if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
-				mx = calcDist(x, y, i.second.x, i.second.y);
-				id = i.first;
-			}
-		}
-		ClosestFsh = id;
+		// int mx = 1e9, id = -1;
+		// for (auto &i: fishes) {
+		// 	if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
+		// 		mx = calcDist(x, y, i.second.x, i.second.y);
+		// 		id = i.first;
+		// 	}
+		// }
+		// ClosestFsh = id;
 		if (TrgetCreatures.empty() || ClosestFsh == -1) {
 			ScanedAll = true;
 			emergencyMove({x, 500});
@@ -139,7 +139,7 @@ public:
 			}
 			if (flag) return (x = tmpX, y = tmpY, true);
 		}
-		x = tmpX, y = tmpY;
+		x = tmpX, y = tmpY;	
 		return false;
 	}
 
@@ -158,7 +158,7 @@ public:
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
-			cerr << "NO WAY OUT\n";
+			// cerr << "NO WAY OUT\n";
 			MoveDrone({x, 500});
 			return ;
 		}
@@ -238,9 +238,13 @@ void calcFishPos(set<int> &DontUpdateThisFishes) {
 	if (Tmp1.y > Tmp2.y) swap(Tmp1, Tmp2);
 	for (auto &i: fishes) {
 		if (DontUpdateThisFishes.count(i.first)) continue;
+		int mxY = 0;
+		if (i.second.type == 0) mxY = 5000;
+		else if (i.second.type == 1) mxY = 7500;
+		else if (i.second.type == 2) mxY = 9999;
 		if (Tmp1.rdrs[i.first] == "BL" || Tmp1.rdrs[i.first] == "BR") {
 			if (Tmp2.rdrs[i.first] == "BL" || Tmp2.rdrs[i.first] == "BR")
-				i.second.y = ((9999 - Tmp2.y) / 2) + Tmp2.y;
+				i.second.y = ((mxY - Tmp2.y) / 2) + Tmp2.y;
 			else
 				i.second.y = Tmp2.y - ((Tmp2.y - Tmp1.y) / 2);
 		}
@@ -264,6 +268,9 @@ int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures) {
 }
 
 void updateClosestIDS() {
+	// for (auto &i: fishes) cerr << i.first << " " << i.second.x << " " << i.second.y << endl;
+	if (dr1.y == 500) dr1.TargetUp = 0;
+	if (dr2.y == 500) dr2.TargetUp = 0;
 	int closest1 = getClosestCreature(-1, dr1, fshs);
 	int closest2 = getClosestCreature(-1, dr2, fshs);
 	if (dr1.TargetUp) closest1 = -1;
@@ -480,6 +487,8 @@ int main()
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		// dr1.PrntErr(), dr2.PrntErr();
+		// cerr << "closest creature id " << dr1.id << " " << dr1.ClosestFsh << endl; 
+		// cerr << "closest creature id " << dr2.id << " " << dr2.ClosestFsh << endl; 
 		if (firstIsFirst) 
 			dr1.displayMove(), dr2.displayMove();
 		else 
