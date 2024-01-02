@@ -12,9 +12,7 @@
 using namespace std;
 #define PI 3.14159265358979323846
 
-int targetFsh;
 map<int, int> fshs, enemyFshs;
-set<int> TargetFshsWithRadar;
 set<int> Mnstrs;
 int rndCnt = 0;
 bool firstIsFirst = true;
@@ -38,6 +36,7 @@ public:
 	int id, x, y, emergency, battery, light, TargetUp = 0;
 	int FirstTx, FirstTy;
 	bool hitTarget;
+	int ClosestFsh = -1, ClosestEnemyFsh = -1;
 	map<int, string> EnemyFshsRdr;
 	map<int, string> rdrs;
 	map<int, int> fishesScaned;
@@ -52,7 +51,7 @@ public:
 	}
 
 	void MoveDrone(pair<int , int> t) {
-		if ((light && y < 6200) || rndCnt < 5 || y < 3000) light = 0;
+		if ((light && y < 5800) || rndCnt < 5 || y < 3000) light = 0;
 		else if (battery >= 5) light = 1;
 		cout << "MOVE " << t.first << " " << t.second << " " << light << endl;
 	}
@@ -61,18 +60,18 @@ public:
 
 		int mx = 1e9, id = -1;
 		for (auto &i: fishes) {
-			if (targetFsh != i.first && TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
+			if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
 				mx = calcDist(x, y, i.second.x, i.second.y);
 				id = i.first;
 			}
 		}
-		if (TrgetCreatures.empty() || id == -1) {
+		ClosestFsh = id;
+		if (TrgetCreatures.empty() || ClosestFsh == -1) {
 			ScanedAll = true;
 			emergencyMove({x, 500});
 			return ;
 		}
-		int tx = fishes[id].x, ty = fishes[id].y;
-		targetFsh = id;
+		int tx = fishes[ClosestFsh].x, ty = fishes[ClosestFsh].y;
 		if (Enemy) {
 			if (tx < 5000) tx += 500;
 			else tx -= 500;
@@ -104,6 +103,7 @@ public:
 	}
 
 	bool moveIsGood(int nextX, int nextY) {
+		if (mnstr.empty()) return true;
 		for (auto &i: mnstr) {
 			if (this->getCollision(i.second, nextX, nextY)) return false;
 		}
@@ -154,7 +154,7 @@ public:
 			ty = round(y + 601 * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
-			if (!tx || !ty || tx >= 9999 || ty >= 9999) continue;
+			if (tx < 20 || !ty || tx >= 9980 || ty >= 9980) continue;
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
@@ -171,7 +171,7 @@ public:
 		if (Ty > 9999) Ty = 9999;
 		if (Ty < 0) Ty = 0;
 		int dx = Tx - x, dy = Ty - y;
-		double dist = sqrt(dx * dx + dy * dy);
+		double dist = sqrt((dx * dx) + (dy * dy));
 		if (dist > 600) {
 			dx = round(dx * 600.0 / dist);
 			dy = round(dy * 600.0 / dist);
@@ -205,10 +205,7 @@ public:
 	}
 };
 
-
-
-Drone dr1, dr2;
-set<int> enemySaved;
+Drone dr1, dr2, EnemyDr1, EnemyDr2;
 
 void updateMonster() {
 	for (auto &i: mnstr) {
@@ -223,7 +220,6 @@ void updateMonster() {
 			i.second.vx *=  round(270.0 / speed), i.second.vy *= round(270.0 / speed);
 	}
 }
-
 
 void calcFishPos(set<int> &DontUpdateThisFishes) {
 	Drone Tmp1 = dr1, Tmp2 = dr2;
@@ -256,6 +252,149 @@ void calcFishPos(set<int> &DontUpdateThisFishes) {
 	}
 }
 
+int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures) {
+	int mn = 1e9, id = -1;
+	for (auto &i: Creatures) {
+		if (i.first == except) continue;
+		int dst = calcDist(dr.x, dr.y, fishes[i.first].x, fishes[i.first].y);
+		if (dst < mn) mn = dst, id = i.first;
+	}
+	return id;
+
+}
+
+void updateClosestIDS() {
+	int closest1 = getClosestCreature(-1, dr1, fshs);
+	int closest2 = getClosestCreature(-1, dr2, fshs);
+	if (dr1.TargetUp) closest1 = -1;
+	if (dr2.TargetUp) closest2 = -1;
+	if (closest1 != -1 && closest1 == closest2) {
+		if (calcDist(dr1.x, dr1.y, fishes[closest1].x, fishes[closest1].y) < calcDist(dr2.x, dr2.y, fishes[closest2].x, fishes[closest2].y))
+			closest2 = getClosestCreature(closest1, dr2, fshs);
+		else
+			closest1 = getClosestCreature(closest2, dr1, fshs);
+	}
+	if (closest1 == -1) getClosestCreature(-1, dr1, enemyFshs);
+	if (closest2 == -1) getClosestCreature(-1, dr2, enemyFshs);
+	if (dr1.TargetUp) closest1 = -1;
+	if (dr2.TargetUp) closest2 = -1;
+	dr1.ClosestFsh = closest1, dr2.ClosestFsh = closest2;
+}
+
+void cinScore() {
+	int my_score;
+	cin >> my_score; cin.ignore();
+	int foe_score;
+	cin >> foe_score; cin.ignore();
+
+}
+void my_scan_count() {
+	int my_scan_count;
+	cin >> my_scan_count; cin.ignore();
+	for (int i = 0; i < my_scan_count; i++) {
+		int creature_id;
+		cin >> creature_id; cin.ignore();
+		if (dr1.fishesScaned.count(creature_id)) {
+			dr1.fishesScaned.erase(creature_id);
+			fshs.erase(creature_id);
+		}
+		if (dr2.fishesScaned.count(creature_id)) {
+			dr2.fishesScaned.erase(creature_id);
+			fshs.erase(creature_id);
+		}
+	}
+}
+
+void foe_scan_count() {
+	int foe_scan_count;
+	cin >> foe_scan_count; cin.ignore();
+	for (int i = 0; i < foe_scan_count; i++) {
+		int creature_id;
+		cin >> creature_id; cin.ignore();
+		if (EnemyDr1.fishesScaned.count(creature_id)) {
+			EnemyDr1.fishesScaned.erase(creature_id);
+			enemyFshs.erase(creature_id);
+		}
+		if (EnemyDr2.fishesScaned.count(creature_id)) {
+			EnemyDr2.fishesScaned.erase(creature_id);
+			enemyFshs.erase(creature_id);
+		}
+	}
+}
+
+void my_drone_count() {
+	int my_drone_count;
+	cin >> my_drone_count; cin.ignore();
+	for (int i = 0; i < my_drone_count; i++) {
+		int drone_id;
+		int drone_x;
+		int drone_y;
+		int emergency;
+		int battery;
+		cin >> drone_id >> drone_x >> drone_y >> emergency >> battery; cin.ignore();
+		if (drone_id == 1 || drone_id == 2) {
+			if (!i) firstIsFirst = false;
+			if(emergency) {
+				for (auto &h:dr2.fishesScaned) fshs[h.first] = h.second;
+				dr2.fishesScaned.clear();
+			}
+			dr2.id = drone_id, dr2.x = drone_x, dr2.y = drone_y, dr2.emergency = emergency, dr2.battery = battery;
+		} else {
+			if(emergency) {
+				for (auto &h:dr1.fishesScaned) fshs[h.first] = h.second;
+				dr1.fishesScaned.clear();
+			}
+			dr1.id = drone_id, dr1.x = drone_x, dr1.y = drone_y, dr1.emergency = emergency, dr1.battery = battery;
+		}
+	}
+}
+
+void foe_drone_count() {
+	int foe_drone_count;
+	cin >> foe_drone_count; cin.ignore();
+	for (int i = 0; i < foe_drone_count; i++) {
+		int drone_id;
+		int drone_x;
+		int drone_y;
+		int emergency;
+		int battery;
+		cin >> drone_id >> drone_x >> drone_y >> emergency >> battery; cin.ignore();
+		if (!i) {
+			if(emergency) {
+				for (auto &h:EnemyDr1.fishesScaned) enemyFshs[h.first] = h.second;
+				EnemyDr1.fishesScaned.clear();
+			}
+			EnemyDr1.id = drone_id, EnemyDr1.x = drone_x, EnemyDr1.y = drone_y, EnemyDr1.emergency = emergency, EnemyDr1.battery = battery;
+		} else {
+			if(emergency) {
+				for (auto &h:EnemyDr2.fishesScaned) enemyFshs[h.first] = h.second;
+				EnemyDr2.fishesScaned.clear();
+			}
+			EnemyDr2.id = drone_id, EnemyDr2.x = drone_x, EnemyDr2.y = drone_y, EnemyDr2.emergency = emergency, EnemyDr2.battery = battery;
+		}
+	}
+}
+
+void drone_scan_count() {
+	int drone_scan_count;
+	cin >> drone_scan_count; cin.ignore();
+	for (int i = 0; i < drone_scan_count; i++) {
+		int drone_id;
+		int creature_id;
+		cin >> drone_id >> creature_id; cin.ignore();
+		if ((drone_id == dr1.id || drone_id == dr2.id) && fshs.count(creature_id)) {
+			if (drone_id == dr1.id ) dr1.fishesScaned[creature_id]=fshs[creature_id];
+			else dr2.fishesScaned[creature_id]=fshs[creature_id];
+			fshs.erase(creature_id);
+		}
+		else if ((drone_id == EnemyDr1.id || drone_id == EnemyDr2.id) && enemyFshs.count(creature_id)) {
+			if (drone_id == EnemyDr1.id ) EnemyDr1.fishesScaned[creature_id]=enemyFshs[creature_id];
+			else EnemyDr2.fishesScaned[creature_id]=enemyFshs[creature_id];
+			enemyFshs.erase(creature_id);
+		}
+	}
+}
+
 int main()
 {
     int creature_count;
@@ -273,33 +412,16 @@ int main()
             Mnstrs.insert(creature_id);
     }
 	enemyFshs = fshs;
-	dr1.FirstTy = 7200, dr2.FirstTy = 7200;
+	dr1.FirstTy = 6000, dr2.FirstTy = 6000;
 	dr1.FirstTx = 2000, dr2.FirstTx = 8000;
+	set<int> creatureInsideMap;
     while (1) {
-		targetFsh = -1;
 		updateMonster();
-		TargetFshsWithRadar.clear();
+		creatureInsideMap.clear();
 		dr1.rdrs.clear(), dr2.rdrs.clear();
         rndCnt++;
-        int  emergency1=0,emergency2=0;
-        int my_score;
-        cin >> my_score; cin.ignore();
-        int foe_score;
-        cin >> foe_score; cin.ignore();
-        int my_scan_count;
-        cin >> my_scan_count; cin.ignore();
-        for (int i = 0; i < my_scan_count; i++) {
-            int creature_id;
-            cin >> creature_id; cin.ignore();
-			if (dr1.fishesScaned.count(creature_id)) {
-				dr1.fishesScaned.erase(creature_id);
-				fshs.erase(creature_id);
-			}
-			if (dr2.fishesScaned.count(creature_id)) {
-				dr2.fishesScaned.erase(creature_id);
-				fshs.erase(creature_id);
-			}
-        }
+        cinScore();
+        my_scan_count();
 		if (fshs.empty()) {
 			if (dr1.fishesScaned.empty() )
 				dr1.ScanedAll = true;
@@ -308,60 +430,10 @@ int main()
 		}
 		if (!dr1.fishesScaned.empty()) dr1.ScanedAll = false;
 		if (!dr2.fishesScaned.empty()) dr2.ScanedAll = false;
-        int foe_scan_count;
-        cin >> foe_scan_count; cin.ignore();
-        for (int i = 0; i < foe_scan_count; i++) {
-            int creature_id;
-            cin >> creature_id; cin.ignore();
-			enemyFshs.erase(creature_id);
-        }
-        int my_drone_count;
-        cin >> my_drone_count; cin.ignore();
-        for (int i = 0; i < my_drone_count; i++) {
-            int drone_id;
-            int drone_x;
-            int drone_y;
-            int emergency;
-            int battery;
-            cin >> drone_id >> drone_x >> drone_y >> emergency >> battery; cin.ignore();
-			if (drone_id == 1 || drone_id == 2) {
-				if (!i) firstIsFirst = false;
-                if(emergency) {
-                    for (auto &h:dr2.fishesScaned) fshs[h.first] = h.second;
-                    dr2.fishesScaned.clear();
-                }
-                dr2.id = drone_id, dr2.x = drone_x, dr2.y = drone_y, dr2.emergency = emergency, dr2.battery = battery;
-            }
-			else {
-                if(emergency) {
-                    for (auto &h:dr1.fishesScaned) fshs[h.first] = h.second;
-                    dr1.fishesScaned.clear();
-                }
-                dr1.id = drone_id, dr1.x = drone_x, dr1.y = drone_y, dr1.emergency = emergency, dr1.battery = battery;
-            }
-        }
-        int foe_drone_count;
-        cin >> foe_drone_count; cin.ignore();
-        for (int i = 0; i < foe_drone_count; i++) {
-            int drone_id;
-            int drone_x;
-            int drone_y;
-            int emergency;
-            int battery;
-            cin >> drone_id >> drone_x >> drone_y >> emergency >> battery; cin.ignore();
-        }
-        int drone_scan_count;
-        cin >> drone_scan_count; cin.ignore();
-        for (int i = 0; i < drone_scan_count; i++) {
-            int drone_id;
-            int creature_id;
-            cin >> drone_id >> creature_id; cin.ignore();
-            if ((drone_id == dr1.id || drone_id == dr2.id) && fshs.count(creature_id)) {
-                if (drone_id == dr1.id ) dr1.fishesScaned[creature_id]=fshs[creature_id];
-                else dr2.fishesScaned[creature_id]=fshs[creature_id];
-                fshs.erase(creature_id);
-            }
-        }
+		foe_scan_count();
+        my_drone_count();
+        foe_drone_count();
+        drone_scan_count();
 		set<int> DontUpdateThisFishes;
         int visible_creature_count;
         cin >> visible_creature_count; cin.ignore();
@@ -382,9 +454,9 @@ int main()
 				fishes[creature_id].vy = creature_vy;
 			}
         }
-        int radar_blip_count;
-        cin >> radar_blip_count; cin.ignore();
-        for (int i = 0; i < radar_blip_count; i++) {
+        int rdrCount;
+        cin >> rdrCount; cin.ignore();
+        for (int i = 0; i < rdrCount; i++) {
             int drone_id;
             int creature_id;
             string radar;
@@ -394,16 +466,17 @@ int main()
                     dr1.rdrs[creature_id] = radar;
                 else
                     dr2.rdrs[creature_id] = radar;
-				TargetFshsWithRadar.insert(creature_id);
+				creatureInsideMap.insert(creature_id);
             }
         }
 		for (auto it = fshs.begin();it != fshs.end();) {
-			if (!TargetFshsWithRadar.count(it->first))
-				fishes.erase(it->first), it = fshs.erase(it);
+			if (!creatureInsideMap.count(it->first))
+				enemyFshs.erase(it->first),fishes.erase(it->first), it = fshs.erase(it);
 			else
 				++it;
 		}
 		calcFishPos(DontUpdateThisFishes);
+		updateClosestIDS();
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		// dr1.PrntErr(), dr2.PrntErr();
