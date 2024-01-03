@@ -28,7 +28,7 @@ class Drone;
 struct Monster {
 	int id, x, y, vx=0, vy=0;
 	bool foundTarget = false;
-	pair<int, int> target;
+	pair<int, int> target={0, 0};
 	bool inRange(int x, int y, int range) {
 		return (x - this->x) * (x - this->x) + (y - this->y) * (y - this->y) <= range * range;
 	}
@@ -37,8 +37,8 @@ struct Monster {
 void updateMonsterPos();
 void updateMonsterSpeed(map<int, Monster> &DontUpdateThisMnstr);
 
-int calcDist(int x1, int y1, int x2, int y2) {
-    return round(sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2)));
+double calcDist(int x1, int y1, int x2, int y2) {
+    return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
 }
 map<int, Monster> mnstr;
 class Drone {
@@ -61,14 +61,12 @@ public:
 	}
 
 	bool inRange(int x, int y, int range) {
-		return (x - this->x) * (x - this->x) + (y - this->y) * (y - this->y) <= range * range;
+		return ((x - this->x) * (x - this->x) + (y - this->y) * (y - this->y) <= range * range);
 	}
 
 	void MoveDrone(pair<int , int> t) {
 		if ((light && y < 5800) || rndCnt < 5 || y < 3000) light = 0;
 		else if (battery >= 5) light = 1;
-		if (light) lightOn = 1;
-		else lightOn = 0;
 		cout << "MOVE " << t.first << " " << t.second << " " << light << endl;
 	}
 
@@ -82,15 +80,18 @@ public:
 		// 	}
 		// }
 		// ClosestFsh = id;
-		if (TrgetCreatures.empty() || ClosestFsh == -1) {
+		int targetFsh = ClosestFsh;
+		if (Enemy || targetFsh == -1)
+			targetFsh = ClosestEnemyFsh;
+		if (targetFsh == -1) {
 			ScanedAll = true;
 			emergencyMove({x, 500});
 			return ;
 		}
-		int tx = fishes[ClosestFsh].x, ty = fishes[ClosestFsh].y;
+		int tx = fishes[targetFsh].x, ty = fishes[targetFsh].y;
 		if (Enemy) {
-			if (tx < 5000) tx += 500;
-			else tx -= 500;
+			if (tx < 5000) tx += 700;
+			else tx -= 700;
 		}
 		emergencyMove({tx, ty});
 	}
@@ -108,6 +109,11 @@ public:
 		if (fshs.empty() || fishesScaned.size() >= 5 || TargetUp) {
 			hitTarget = 1;
 			TargetUp = 1;
+			// if (ClosestEnemyFsh != -1) {
+			// 	targetWithRdr(enemyFshs, 1);
+			// 	return ;
+			// }
+			cerr << "NO TARGET\n";
 			return (emergencyMove({x, 500}));
 		}
 
@@ -144,7 +150,7 @@ public:
 			}
 			if (flag) return (mnstr = TmpMnst, x = tmpX, y = tmpY, true);
 		}
-		mnstr = TmpMnst, x = tmpX, y = tmpY;	
+		mnstr = TmpMnst, x = tmpX, y = tmpY;
 		return false;
 	}
 
@@ -163,7 +169,6 @@ public:
 			if (moveIsGood(tx, ty)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
-			// cerr << "NO WAY OUT\n";
 			MoveDrone({x, 500});
 			return ;
 		}
@@ -211,8 +216,7 @@ public:
 };
 bool Monster::DroneInRange(Drone &dr) {
 	if (dr.emergency) return false;
-	if (dr.inRange(x, y, dr.lightOn ? 2000 : 800)) return true;
-	return false;
+	return (dr.inRange(x, y, dr.lightOn ? 2000 : 800));
 }
 Drone dr1, dr2, EnemyDr1, EnemyDr2;
 
@@ -227,11 +231,22 @@ bool updateUglyTarget (Monster &ugly) {
 		ugly.foundTarget = false;
 		return false;
 	}
-	int mn = 1e9;
+	vector<pair<int, int>> closests;
+	double mn = 1e9;
 	for (auto &i: targetableDrones) {
-		int dst = calcDist(ugly.x, ugly.y, i.x, i.y);
-		if (dst < mn) mn = dst, ugly.target = {i.x, i.y};
+		double dst = calcDist(ugly.x, ugly.y, i.x, i.y);
+		if (dst < mn) {
+			mn = dst;
+			closests.clear();
+			closests.push_back({i.x, i.y});
+		}
+		else if (dst == mn) closests.push_back({i.x, i.y});
 	}
+	double targetX = 0, targetY = 0;
+	for (auto &i: closests) {
+		targetX += i.first, targetY += i.second;
+	}
+	ugly.target = {targetX / closests.size(), targetY / closests.size()};
 	ugly.foundTarget = true;
 	return true;
 }
@@ -342,25 +357,23 @@ int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures) {
 
 }
 
-void updateClosestIDS() {
+void updateClosestIDS(map<int, int> &Creatures, int &dr1Closest, int &dr2Closest) {
 	// for (auto &i: fishes) cerr << i.first << " " << i.second.x << " " << i.second.y << endl;
 	if (dr1.y == 500) dr1.TargetUp = 0;
 	if (dr2.y == 500) dr2.TargetUp = 0;
-	int closest1 = getClosestCreature(-1, dr1, fshs);
-	int closest2 = getClosestCreature(-1, dr2, fshs);
-	if (dr1.TargetUp) closest1 = -1;
-	if (dr2.TargetUp) closest2 = -1;
+	int closest1 = getClosestCreature(-1, dr1, Creatures);
+	int closest2 = getClosestCreature(-1, dr2, Creatures);
+	// if (dr1.TargetUp) closest1 = -1;
+	// if (dr2.TargetUp) closest2 = -1;
 	if (closest1 != -1 && closest1 == closest2) {
 		if (calcDist(dr1.x, dr1.y, fishes[closest1].x, fishes[closest1].y) < calcDist(dr2.x, dr2.y, fishes[closest2].x, fishes[closest2].y))
-			closest2 = getClosestCreature(closest1, dr2, fshs);
+			closest2 = getClosestCreature(closest1, dr2, Creatures);
 		else
-			closest1 = getClosestCreature(closest2, dr1, fshs);
+			closest1 = getClosestCreature(closest2, dr1, Creatures);
 	}
-	if (closest1 == -1) getClosestCreature(-1, dr1, enemyFshs);
-	if (closest2 == -1) getClosestCreature(-1, dr2, enemyFshs);
-	if (dr1.TargetUp) closest1 = -1;
-	if (dr2.TargetUp) closest2 = -1;
-	dr1.ClosestFsh = closest1, dr2.ClosestFsh = closest2;
+	// if (dr1.TargetUp) closest1 = -1;
+	// if (dr2.TargetUp) closest2 = -1;
+	dr1Closest = closest1, dr2Closest = closest2;
 }
 
 void cinScore() {
@@ -420,12 +433,18 @@ void my_drone_count() {
 				for (auto &h:dr2.fishesScaned) fshs[h.first] = h.second;
 				dr2.fishesScaned.clear();
 			}
+			if (dr2.batteryBefore - battery == 5) dr2.lightOn = 1;
+			else dr2.lightOn = 0;
+			dr2.batteryBefore = battery;
 			dr2.id = drone_id, dr2.x = drone_x, dr2.y = drone_y, dr2.emergency = emergency, dr2.battery = battery;
 		} else {
 			if(emergency) {
 				for (auto &h:dr1.fishesScaned) fshs[h.first] = h.second;
 				dr1.fishesScaned.clear();
 			}
+			if (dr1.batteryBefore - battery == 5) dr1.lightOn = 1;
+			else dr1.lightOn = 0;
+			dr1.batteryBefore = battery;
 			dr1.id = drone_id, dr1.x = drone_x, dr1.y = drone_y, dr1.emergency = emergency, dr1.battery = battery;
 		}
 	}
@@ -557,21 +576,23 @@ int main()
 				creatureInsideMap.insert(creature_id);
             }
         }
-		for (auto it = fshs.begin();it != fshs.end();) {
+		for (auto it = fishes.begin();it != fishes.end();) {
 			if (!creatureInsideMap.count(it->first))
-				enemyFshs.erase(it->first),fishes.erase(it->first), it = fshs.erase(it);
+				enemyFshs.erase(it->first),fshs.erase(it->first), it = fishes.erase(it);
 			else
 				++it;
 		}
+		// for (auto &i:enemyFshs) cerr << i.first << endl;
 		updateMonsterSpeed(DontUpdateThisMnstr);
+		for (auto &i:mnstr) cerr << i.first << " " << i.second.x<< " " << i.second.y << " " << i.second.vx << " " << i.second.vy<<endl;
 		calcFishPos(DontUpdateThisFishes);
-		updateClosestIDS();
+		updateClosestIDS(fshs, dr1.ClosestFsh, dr2.ClosestFsh);
+		updateClosestIDS(enemyFshs, dr1.ClosestEnemyFsh, dr2.ClosestEnemyFsh);
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		// dr1.PrntErr(), dr2.PrntErr();
-		// cerr << "closest creature id " << dr1.id << " " << dr1.ClosestFsh << endl; 
-		// cerr << "closest creature id " << dr2.id << " " << dr2.ClosestFsh << endl; 
-		for (auto &i:mnstr) cerr << i.second.id << " " << i.second.x << " " << i.second.y << " " << i.second.vx << " " << i.second.vy << endl;
+		// cerr << "closest creature id " << dr1.id << " " << dr1.ClosestEnemyFsh << endl; 
+		// cerr << "closest creature id " << dr2.id << " " << dr2.ClosestEnemyFsh << endl; 
 		if (firstIsFirst) 
 			dr1.displayMove(), dr2.displayMove();
 		else 
