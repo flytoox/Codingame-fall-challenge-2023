@@ -98,7 +98,7 @@ public:
 			if (tx < 5000) tx += 600;
 			else tx -= 600;
 		}
-		if (targetFsh == ClosestFsh && (ty >= y - 500 && ty <= y + 500 && ((tx > x && x >= 8300) || (tx < x && x <= 1700))))
+		if (targetFsh == ClosestFsh && (ty >= y - 1000 && ty <= y + 1000 && ((tx > x && x >= 8300) || (tx < x && x <= 1700))))
 			tx = x, ty = y;
 		emergencyMove({tx, ty});
 	}
