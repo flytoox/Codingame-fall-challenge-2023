@@ -8,7 +8,7 @@
 #include <chrono>
 #include <set>
 #define DRONE_HIT_RANGE 200
-#define UGLY_EAT_RANGE 330
+#define UGLY_EAT_RANGE 300
 #define DRONE_MOVE_SPEED 600
 #define UGLY_ATTACK_SPEED (int)(DRONE_MOVE_SPEED * 0.9)
 #define UGLY_SEARCH_SPEED (int)(UGLY_ATTACK_SPEED / 2)
@@ -37,6 +37,7 @@ struct Monster {
 };
 void updateMonsterPos();
 void updateMonsterSpeed(map<int, Monster> &DontUpdateThisMnstr);
+void updateUglySpeed(Monster &Mnst);
 
 double calcDist(int x1, int y1, int x2, int y2) {
     return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
@@ -76,18 +77,10 @@ public:
 	}
 
 	void targetWithRdr(map<int,int> &TrgetCreatures, bool Enemy) {
-
-		// int mx = 1e9, id = -1;
-		// for (auto &i: fishes) {
-		// 	if (TrgetCreatures.count(i.first) && calcDist(x, y, i.second.x, i.second.y) < mx) {
-		// 		mx = calcDist(x, y, i.second.x, i.second.y);
-		// 		id = i.first;
-		// 	}
-		// }
-		// ClosestFsh = id;
 		int targetFsh = ClosestFsh;
 		if (Enemy || targetFsh == -1)
 			targetFsh = ClosestEnemyFsh;
+		if (targetFsh == -1) targetFsh = ClosestFsh;
 		if (targetFsh == -1) {
 			ScanedAll = true;
 			emergencyMove({x, 500});
@@ -98,8 +91,9 @@ public:
 			if (tx < 5000) tx += 600;
 			else tx -= 600;
 		}
-		if (targetFsh == ClosestFsh && (ty >= y - 1000 && ty <= y + 1000 && ((tx > x && x >= 8300) || (tx < x && x <= 1700))))
+		if (targetFsh == ClosestFsh && (ty >= y - 1000 && ty <= y + 1000 && ((tx > x && x >= 7800) || (tx < x && x <= 2200))))
 			tx = x, ty = y;
+		if (y < ty - 2000 || y > ty + 2000) tx = x;
 		emergencyMove({tx, ty});
 	}
 
@@ -114,7 +108,7 @@ public:
 			return ;
 		}
 		if (fshs.empty() || fishesScaned.size() >= 5 || TargetUp) {
-			if ((EnemyDr.y < y - 570 && EnemyDr.fishesScaned.size() >= fishesScaned.size() - 1) || ( ClosestEnemyFsh!= -1 && keepDoing)) {
+			if ((EnemyDr.y < y - 570 && EnemyDr.fishesScaned.size() >= fishesScaned.size() - 1) || (ClosestEnemyFsh!= -1 && keepDoing && fishes.count(ClosestEnemyFsh))) {
 				keepDoing  = 1;
 				targetWithRdr(enemyFshs, 1);
 				return ;
@@ -145,67 +139,56 @@ public:
 		x = nextX, y = nextY;
 		auto TmpMnst = mnstr;
 		updateMonsterPos();
-		map<int, Monster> khawi;
-		updateMonsterSpeed(khawi);
-		for (int i = 0; i < 100; i++) {
+		for (auto &i:mnstr) {
+			i.second.target = {x, y};
+			i.second.foundTarget = true;
+			updateUglySpeed(i.second);
+		}
+		for (int i = 0; i < 300; i++) {
 			bool flag = true;
-			double theta = 2 * PI * i / 100;
+			double theta = 2 * PI * i / 300;
 			int tx = round(x + distance * cos(theta));
 			int ty = round(y + distance * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
-			if (tx < 100 || !ty || tx >= 9900 || ty >= 9900) continue;
+			if (tx < 200 || !ty || tx >= 9800 || ty >= 9800) continue;
 			for (auto &j: mnstr) {
 				if (this->getCollision(j.second, tx, ty)) {
 					flag = false;
 					break;
 				}
 			}
-			if (flag) return (mnstr = TmpMnst, x = tmpX, y = tmpY, true);
-		}
-		for (int i = 0; i < 100; i++) {
-			bool flag = true;
-			double theta = 2 * PI * i / 100;
-			int tx = round(x + 620 * cos(theta));
-			int ty = round(y + 620 * sin(theta));
-			auto tmp = calcNextLoc(tx, ty);
-			tx = tmp.first, ty = tmp.second;
-			if (tx < 100 || !ty || tx >= 9900 || ty >= 9900) continue;
-			for (auto &j: mnstr) {
-				if (this->getCollision(j.second, tx, ty)) {
-					flag = false;
-					break;
-				}
-			}
-			if (flag) return (mnstr = TmpMnst, x = tmpX, y = tmpY, true);
+			if (flag) return (mnstr = TmpMnst, x = tmpX, y = tmpY,  true);
 		}
 		mnstr = TmpMnst, x = tmpX, y = tmpY;
 		return false;
 	}
 
 	void emergencyMove(pair<int, int> T) {
+		if (T.first < 200) T.first = 200;
+		if (T.first > 9800) T.first = 9800;
+		if (T.second > 9800) T.second = 9800;
 		auto T1 = calcNextLoc(T.first, T.second);
+		if (ClosestEnemyFsh != -1 && calcDist(x, y, fishes[ClosestEnemyFsh].x, fishes[ClosestEnemyFsh].y) <= 1700
+			&& (fishes[ClosestEnemyFsh].x < 2000 || fishes[ClosestEnemyFsh].x > 8000)) {
+				double vectrX = fishes[ClosestEnemyFsh].x - x, vectrY = fishes[ClosestEnemyFsh].y - y;
+				double vectrTx = T1.first - x, vectrTy = T1.second - y;
+				vectrTx += vectrX, vectrTy += vectrY;
+				T1.first = round(vectrTx) + x, T1.second = round(vectrTy) + y;
+		}
 		map<int, pair<int, int>> mvs;
 		int tx = T1.first, ty = T1.second;
 		double distance = calcDist(x, y, tx, ty);
+		distance = 620;
 		if (moveIsGood(tx, ty, distance)) return MoveDrone({tx, ty});
-		for (int i = 0; i < 100; i++) {
-			double theta = 2 * PI * i / 100;
+		for (int i = 0; i < 300; i++) {
+			double theta = 2 * PI * i / 300;
 			tx = round(x + distance * cos(theta));
 			ty = round(y + distance * sin(theta));
 			auto tmp = calcNextLoc(tx, ty);
 			tx = tmp.first, ty = tmp.second;
-			if (tx < 100 || !ty || tx >= 9900 || ty >= 9900) continue;
+			if (tx < 200 || tx >= 9800 || ty >= 9800) continue;
 			if (moveIsGood(tx, ty, distance)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
-    	}
-		for (int i = 0; i < 100; i++) {
-			double theta = 2 * PI * i / 100;
-			tx = round(x + 620 * cos(theta));
-			ty = round(y + 620 * sin(theta));
-			auto tmp = calcNextLoc(tx, ty);
-			tx = tmp.first, ty = tmp.second;
-			if (tx < 100 || !ty || tx >= 9900 || ty >= 9900) continue;
-			if (moveIsGood(tx, ty, 620)) mvs[calcDist(tx, ty, T.first, T.second)] = {tx, ty};
     	}
 		if (mvs.empty()) {
 			MoveDrone({x, 500});
@@ -232,8 +215,10 @@ public:
 
 		pair<int, int> nextLoc = this->calcNextLoc(nextX, nextY);
 		double DroneSpeedX = nextLoc.first - this->x, DroneSpeedY = nextLoc.second - this->y;
+		Monster tmpNext = mn;
+		tmpNext.x += mn.vx, tmpNext.y += mn.vy;
 
-		if (mn.inRange(nextLoc.first, nextLoc.second, DRONE_HIT_RANGE + UGLY_EAT_RANGE)) return true;
+		if (mn.inRange(x, y, DRONE_HIT_RANGE + UGLY_EAT_RANGE) || tmpNext.inRange(nextLoc.first, nextLoc.second, DRONE_HIT_RANGE + UGLY_EAT_RANGE)) return true;
 		if (!mn.vx && !mn.vy && !DroneSpeedX && !DroneSpeedY) return false;
 
 		double x = mn.x, y = mn.y, ux = this->x, uy = this->y;
@@ -242,7 +227,7 @@ public:
 
 		double vx2 = mn.vx - DroneSpeedX, vy2 = mn.vy - DroneSpeedY;
 		double a = vx2 * vx2 + vy2 * vy2;
-		if ( a <= 0.0) return false;
+		if (a <= 0.0) return false;
 		double b = 2.0 * (x2 * vx2 + y2 * vy2);
 		double c = x2 * x2 + y2 * y2 - r2 * r2;
 		double delta = b * b - 4.0 * a * c;
@@ -291,7 +276,6 @@ bool updateUglyTarget (Monster &ugly) {
 }
 
 void updateUglySpeed(Monster &Mnst) {
-	updateUglyTarget(Mnst);
 	if (Mnst.foundTarget) {
 		pair<double, double> attackVec = {Mnst.target.first - Mnst.x, Mnst.target.second - Mnst.y};
 		double length = sqrt(attackVec.first * attackVec.first + attackVec.second * attackVec.second);
@@ -339,6 +323,7 @@ void updateMonsterSpeed(map<int, Monster> &DontUpdateThisMnstr) {
 		mnstr[i.first] = i.second;
 	for (auto &i: mnstr) {
 		if (DontUpdateThisMnstr.count(i.first)) continue;
+		updateUglyTarget(i.second);
 		updateUglySpeed(i.second);
 	}
 }
@@ -347,6 +332,11 @@ void updateMonsterPos() {
 	for (auto &i: mnstr) {
 		i.second.x += i.second.vx;
 		i.second.y += i.second.vy;
+		if (i.second.y > 9999) 
+            i.second.y = 9999;
+		else if (i.second.y < 2500) 
+            i.second.y = 2500;
+        
 	}
 }
 
@@ -565,7 +555,7 @@ int main()
             Mnstrs.insert(creature_id);
     }
 	enemyFshs = fshs;
-	dr1.FirstTy = 6600, dr2.FirstTy = 6600;
+	dr1.FirstTy = 7300, dr2.FirstTy = 7300;
 	dr1.FirstTx = 2000, dr2.FirstTx = 8000;
 	set<int> creatureInsideMap;
     while (1) {
@@ -597,7 +587,7 @@ int main()
             int creature_vx;
             int creature_vy;
             cin >> creature_id >> creature_x >> creature_y >> creature_vx >> creature_vy; cin.ignore();
-            if (Mnstrs.count(creature_id))
+			if (Mnstrs.count(creature_id))
 				DontUpdateThisMnstr[creature_id] = {creature_id, creature_x, creature_y, creature_vx, creature_vy};
 			else {
 				DontUpdateThisFishes.insert(creature_id);
@@ -628,17 +618,15 @@ int main()
 			else
 				++it;
 		}
-		// for (auto &i:enemyFshs) cerr << i.first << endl;
 		updateMonsterSpeed(DontUpdateThisMnstr);
-		// for (auto &i:mnstr) cerr << i.first << " " << i.second.x<< " " << i.second.y << " " << i.second.vx << " " << i.second.vy<<endl;
+		// for (auto &i: mnstr) cerr << i.first << " " << i.second.x << " " << i.second.y << ' ' << i.second.vx << ' ' << i.second.vy << endl;
 		calcFishPos(DontUpdateThisFishes);
 		updateClosestIDS(fshs, dr1.ClosestFsh, dr2.ClosestFsh);
 		updateClosestIDS(enemyFshs, dr1.ClosestEnemyFsh, dr2.ClosestEnemyFsh);
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		// dr1.PrntErr(), dr2.PrntErr();
-		// cerr << "closest creature id " << dr1.id << " " << dr1.ClosestEnemyFsh << endl; 
-		// cerr << "closest creature id " << dr2.id << " " << dr2.ClosestEnemyFsh << endl; 
+		cerr << dr1.ClosestFsh << " " << dr2.ClosestFsh << endl;
 		if (firstIsFirst) 
 			dr1.displayMove(EnemyDr1), dr2.displayMove(EnemyDr2);
 		else 
