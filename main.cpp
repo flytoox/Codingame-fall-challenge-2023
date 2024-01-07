@@ -135,7 +135,7 @@ public:
 		if (fshs.empty() || shoulsGoUp() || TargetUp) {
 			if ((EnemyDr.y < y - 570 && EnemyDr.fishesScaned.size() >= fishesScaned.size() - 1) || (ClosestEnemyFsh!= -1 && keepDoing && fishes.count(ClosestEnemyFsh))) {
 				keepDoing  = 1;
-				targetWithRdr(enemyFshs, 1);
+				targetWithRdr(enemyFshs, 0);
 				return ;
 			}
 			hitTarget = 1;
@@ -193,7 +193,7 @@ public:
 		if (T.first > 9800) T.first = 9800;
 		if (T.second > 9800) T.second = 9800;
 		auto T1 = calcNextLoc(T.first, T.second);
-		if (T1.first != fishes[ClosestEnemyFsh].x && T1.second != fishes[ClosestEnemyFsh].y && ClosestEnemyFsh != -1 && ((fishes[ClosestEnemyFsh].y >= y - 50 && T1.second - y >= 0) || (fishes[ClosestEnemyFsh].y <= y + 50 && T1.second - y <= 0))
+		if (ClosestEnemyFsh != -1 && ((fishes[ClosestEnemyFsh].y >= y - 50 && T1.second - y >= 0) || (fishes[ClosestEnemyFsh].y <= y + 50 && T1.second - y <= 0))
 			&& calcDist(x, y, fishes[ClosestEnemyFsh].x, fishes[ClosestEnemyFsh].y) <= 1700
 			&& (fishes[ClosestEnemyFsh].x < 2000 || fishes[ClosestEnemyFsh].x > 8000)) {
 				double vectrX = fishes[ClosestEnemyFsh].x - x, vectrY = fishes[ClosestEnemyFsh].y - y;
@@ -686,8 +686,10 @@ int main()
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
 		// dr1.PrntErr(), dr2.PrntErr();
 		for (auto &i:fishes) cerr << i.first << " " << i.second.x << " " << i.second.y << " is RIGHT " << i.second.right<< endl;
-		cerr << dr1.ClosestFsh << " " << dr2.ClosestFsh << endl;
-		cerr << dr1.ClosestEnemyFsh << " " << dr2.ClosestEnemyFsh << endl;
+		cerr << "Dr1 closest fsh " << dr1.ClosestFsh << ' ' << fishes[dr1.ClosestFsh].x << ' ' << fishes[dr1.ClosestFsh].y << endl;
+		cerr << "Dr1 closest enemy fsh " << dr1.ClosestEnemyFsh << ' ' << fishes[dr1.ClosestEnemyFsh].x << ' ' << fishes[dr1.ClosestEnemyFsh].y << endl;
+		cerr << "Dr2 closest fsh " << dr2.ClosestFsh << ' ' << fishes[dr2.ClosestFsh].x << ' ' << fishes[dr2.ClosestFsh].y << endl;
+		cerr << "Dr2 closest enemy fsh " << dr2.ClosestEnemyFsh << ' ' << fishes[dr2.ClosestEnemyFsh].x << ' ' << fishes[dr2.ClosestEnemyFsh].y << endl;
 		if (firstIsFirst) 
 			dr1.displayMove(EnemyDr1), dr2.displayMove(EnemyDr2);
 		else 
