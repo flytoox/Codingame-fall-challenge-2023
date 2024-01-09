@@ -59,13 +59,6 @@ public:
 	map<int, int> fishesScaned;
 	Drone():light(0), hitTarget(0){}
 
-	void PrntErr() {
-		cerr << "id: " << id << endl;
-		cerr << "fishesScaned: " << endl;
-		for (auto &i: fishesScaned) cerr << i.first << " " << i.second << endl;
-		cerr << "---" << endl;
-	}
-
 	bool inRange(int x, int y, int range) {
 		return ((x - this->x) * (x - this->x) + (y - this->y) * (y - this->y) <= range * range);
 	}
@@ -98,7 +91,8 @@ public:
 		TrgetX = tx, TrgetY = ty;
 		emergencyMove({tx, ty});
 	}
-	bool shoulsGoUp() {
+
+	bool shouldGoUp() {
 		bool scanedType2 = false;
 		for (auto &i:fishesScaned) {
 			if (i.second == 2) scanedType2 = true;
@@ -121,6 +115,7 @@ public:
 		}
 		return (fishesScaned.size() >= 5);
 	}
+
 	void displayMove(Drone &EnemyDr) {
 		TrgetX = -1, TrgetY = -1;
 		if (emergency) {
@@ -132,18 +127,14 @@ public:
 			targetWithRdr(enemyFshs, 1);
 			return ;
 		}
-		if (fshs.empty() || shoulsGoUp() || TargetUp) {
-			if ((EnemyDr.y < y - 570 && EnemyDr.fishesScaned.size() >= fishesScaned.size() - 1) || (ClosestEnemyFsh!= -1 && keepDoing && fishes.count(ClosestEnemyFsh))) {
+		if (fshs.empty() || shouldGoUp() || TargetUp) {
+			if ((EnemyDr.y < y - 580 && EnemyDr.fishesScaned.size() >= fishesScaned.size() - 1) || (ClosestEnemyFsh!= -1 && keepDoing && fishes.count(ClosestEnemyFsh))) {
 				keepDoing  = 1;
-				targetWithRdr(enemyFshs, 0);
+				targetWithRdr(enemyFshs, 1);
 				return ;
 			}
 			hitTarget = 1;
 			TargetUp = 1;
-			// if (ClosestEnemyFsh != -1) {
-			// 	targetWithRdr(enemyFshs, 1);
-			// 	return ;
-			// }
 			cerr << "NO TARGET\n";
 			return (emergencyMove({x, 500}));
 		}
@@ -193,7 +184,7 @@ public:
 		if (T.first > 9800) T.first = 9800;
 		if (T.second > 9800) T.second = 9800;
 		auto T1 = calcNextLoc(T.first, T.second);
-		if (ClosestEnemyFsh != -1 && ((fishes[ClosestEnemyFsh].y >= y - 50 && T1.second - y >= 0) || (fishes[ClosestEnemyFsh].y <= y + 50 && T1.second - y <= 0))
+		if (T1.first != fishes[ClosestEnemyFsh].x && T1.second != fishes[ClosestEnemyFsh].y && ClosestEnemyFsh != -1 && ((fishes[ClosestEnemyFsh].y >= y - 50 && T1.second - y >= 0) || (fishes[ClosestEnemyFsh].y <= y + 50 && T1.second - y <= 0))
 			&& calcDist(x, y, fishes[ClosestEnemyFsh].x, fishes[ClosestEnemyFsh].y) <= 1700
 			&& (fishes[ClosestEnemyFsh].x < 2000 || fishes[ClosestEnemyFsh].x > 8000)) {
 				double vectrX = fishes[ClosestEnemyFsh].x - x, vectrY = fishes[ClosestEnemyFsh].y - y;
@@ -396,33 +387,13 @@ void calcFishPos(set<int> &DontUpdateThisFishes) {
 			i.second.y = ((mxY - Tmp1.y) / 2) + Tmp1.y;
 		else if (Tmp2.rdrs[i.first] == "TL" || Tmp2.rdrs[i.first] == "TR" && Tmp2.y <= mxY && Tmp2.y >= MinY)
 			i.second.y = Tmp2.y - ((Tmp2.y - MinY) / 2);
-		
-			// if (Tmp2.rdrs[i.first] == "BL" || Tmp2.rdrs[i.first] == "BR")
-			// 	i.second.y = ((mxY - Tmp2.y) / 2) + Tmp2.y;
-			// else
-			// 	i.second.y = Tmp2.y - ((Tmp2.y - Tmp1.y) / 2);
 	}
 }
 
-int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures, bool isEnemy) {
+int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures) {
 	int mn = 1e9, id = -1;
-	int type = 3;
 	for (auto &i: Creatures) {
-		if (i.first == except || (!isEnemy &&i.second != type)) continue;
-		int dst = calcDist(dr.x, dr.y, fishes[i.first].x, fishes[i.first].y);
-		if (dst < mn) mn = dst, id = i.first;
-	}
-	if (id != -1) return id;
-	type--;
-	for (auto &i: Creatures) {
-		if (i.first == except || (!isEnemy &&i.second != type)) continue;
-		int dst = calcDist(dr.x, dr.y, fishes[i.first].x, fishes[i.first].y);
-		if (dst < mn) mn = dst, id = i.first;
-	}
-	if (id != -1) return id;
-	type--;
-	for (auto &i: Creatures) {
-		if (i.first == except || (!isEnemy &&i.second != type)) continue;
+		if (i.first == except) continue;
 		int dst = calcDist(dr.x, dr.y, fishes[i.first].x, fishes[i.first].y);
 		if (dst < mn) mn = dst, id = i.first;
 	}
@@ -430,27 +401,21 @@ int getClosestCreature(int except, Drone &dr, map<int, int> &Creatures, bool isE
 
 }
 
-void updateClosestIDS(map<int, int> &Creatures, int &dr1Closest, int &dr2Closest, bool isEnemy) {
-	// for (auto &i: fishes) cerr << i.first << " " << i.second.x << " " << i.second.y << endl;
+void updateClosestIDS(map<int, int> &Creatures, int &dr1Closest, int &dr2Closest) {
 	if (dr1.y == 500) dr1.TargetUp = 0;
 	if (dr2.y == 500) dr2.TargetUp = 0;
-	int closest1 = getClosestCreature(-1, dr1, Creatures, isEnemy);
-	int closest2 = getClosestCreature(-1, dr2, Creatures, isEnemy);
+	int closest1 = getClosestCreature(-1, dr1, Creatures);
+	int closest2 = getClosestCreature(-1, dr2, Creatures);
 	if (dr1.TargetUp) closest1 = -1;
 	if (dr2.TargetUp) closest2 = -1;
 	if (closest1 != -1 && closest1 == closest2) {
 		if (calcDist(dr1.x, dr1.y, fishes[closest1].x, fishes[closest1].y) < calcDist(dr2.x, dr2.y, fishes[closest2].x, fishes[closest2].y))
-			closest2 = getClosestCreature(closest1, dr2, Creatures, isEnemy);
+			closest2 = getClosestCreature(closest1, dr2, Creatures);
 		else
-			closest1 = getClosestCreature(closest2, dr1, Creatures, isEnemy);
+			closest1 = getClosestCreature(closest2, dr1, Creatures);
 	}
-	// if (dr1.TargetUp) closest1 = -1;
-	// if (dr2.TargetUp) closest2 = -1;
-	// if (dr1Closest != -1 && Creatures.count(dr1.ClosestFsh)) closest1 = dr1Closest;
-	// if (dr2Closest != -1 && Creatures.count(dr2.ClosestFsh)) closest2 = dr2Closest;
 	dr1Closest = closest1, dr2Closest = closest2;
 }
-
 
 void	init_calcFshs() {
 	if (firstIsFirst) {
@@ -469,6 +434,7 @@ void	init_calcFshs() {
 		}
 	}
 }
+
 void cinScore() {
 	int my_score;
 	cin >> my_score; cin.ignore();
@@ -476,6 +442,7 @@ void cinScore() {
 	cin >> foe_score; cin.ignore();
 
 }
+
 void my_scan_count() {
 	int my_scan_count;
 	cin >> my_scan_count; cin.ignore();
@@ -652,11 +619,23 @@ int main()
 				fishes[creature_id].y = creature_y;
 				fishes[creature_id].vx = creature_vx;
 				fishes[creature_id].vy = creature_vy;
+				if (rndCnt < 20) {
+					int nxtId = -1;
+					if (fishes.count(creature_id + 1) && fishes[creature_id + 1].type == fishes[creature_id].type)
+						nxtId = creature_id + 1;
+					else if (fishes.count(creature_id - 1) && fishes[creature_id - 1].type == fishes[creature_id].type)
+						nxtId = creature_id - 1;
+					if (nxtId == -1) continue;
+					fishes[nxtId] = fishes[creature_id];
+					fishes[nxtId].x = 9999 - fishes[creature_id].x;
+					fishes[nxtId].vx = -fishes[creature_id].vx;
+					DontUpdateThisFishes.insert(nxtId);
+				}
 			}
         }
-        int rdrCount;
-        cin >> rdrCount; cin.ignore();
-        for (int i = 0; i < rdrCount; i++) {
+        int radarCount;
+        cin >> radarCount; cin.ignore();
+        for (int i = 0; i < radarCount; i++) {
             int drone_id;
             int creature_id;
             string radar;
@@ -676,20 +655,13 @@ int main()
 				++it;
 		}
 		updateMonsterSpeed(DontUpdateThisMnstr);
-		// for (auto &i: mnstr) cerr << i.first << " " << i.second.x << " " << i.second.y << ' ' << i.second.vx << ' ' << i.second.vy << endl;
 		calcFishPos(DontUpdateThisFishes);
 		if (rndCnt == 1)
 			init_calcFshs();
-		updateClosestIDS(fshs, dr1.ClosestFsh, dr2.ClosestFsh, false);
-		updateClosestIDS(enemyFshs, dr1.ClosestEnemyFsh, dr2.ClosestEnemyFsh, true);
+		updateClosestIDS(fshs, dr1.ClosestFsh, dr2.ClosestFsh);
+		updateClosestIDS(enemyFshs, dr1.ClosestEnemyFsh, dr2.ClosestEnemyFsh);
 		if (dr1.y >= dr1.FirstTy) dr1.hitTarget = 1;
 		if (dr2.y >= dr2.FirstTy) dr2.hitTarget = 1;
-		// dr1.PrntErr(), dr2.PrntErr();
-		for (auto &i:fishes) cerr << i.first << " " << i.second.x << " " << i.second.y << " is RIGHT " << i.second.right<< endl;
-		cerr << "Dr1 closest fsh " << dr1.ClosestFsh << ' ' << fishes[dr1.ClosestFsh].x << ' ' << fishes[dr1.ClosestFsh].y << endl;
-		cerr << "Dr1 closest enemy fsh " << dr1.ClosestEnemyFsh << ' ' << fishes[dr1.ClosestEnemyFsh].x << ' ' << fishes[dr1.ClosestEnemyFsh].y << endl;
-		cerr << "Dr2 closest fsh " << dr2.ClosestFsh << ' ' << fishes[dr2.ClosestFsh].x << ' ' << fishes[dr2.ClosestFsh].y << endl;
-		cerr << "Dr2 closest enemy fsh " << dr2.ClosestEnemyFsh << ' ' << fishes[dr2.ClosestEnemyFsh].x << ' ' << fishes[dr2.ClosestEnemyFsh].y << endl;
 		if (firstIsFirst) 
 			dr1.displayMove(EnemyDr1), dr2.displayMove(EnemyDr2);
 		else 
